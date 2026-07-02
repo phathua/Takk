@@ -13,6 +13,7 @@
     GripVertical,
     Loader2,
     AlertTriangle,
+    ArrowUpDown,
   } from "lucide-svelte";
   import { slide } from "svelte/transition";
   import { flip } from "svelte/animate";
@@ -255,13 +256,22 @@
         >Danh sách file ({appState.files.length})</span
       >
       {#if appState.files.length > 0}
-        <button
-          onclick={() => appState.handleAddFiles()}
-          class="p-1 hover:bg-[var(--active-file-bg)] rounded text-[var(--accent)] cursor-pointer transition"
-          title="Thêm file nhanh"
-        >
-          <Plus size={12} />
-        </button>
+        <div class="flex items-center gap-1">
+          <button
+            onclick={() => appState.sortFilesByPriority()}
+            class="p-1 hover:bg-[var(--active-file-bg)] rounded text-[var(--accent)] cursor-pointer transition"
+            title="Sắp xếp theo thứ tự ưu tiên"
+          >
+            <ArrowUpDown size={12} />
+          </button>
+          <button
+            onclick={() => appState.handleAddFiles()}
+            class="p-1 hover:bg-[var(--active-file-bg)] rounded text-[var(--accent)] cursor-pointer transition"
+            title="Thêm file nhanh"
+          >
+            <Plus size={12} />
+          </button>
+        </div>
       {/if}
     </div>
 
