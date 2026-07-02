@@ -1,0 +1,169 @@
+@import "tailwindcss";
+
+@variant dark (&:where(.dark, .dark *));
+
+:root {
+  --background: #f8fafc; /* Light slate bg */
+  --text: #0f172a; /* Dark slate text */
+  --text-muted: #64748b; /* Muted text */
+  --border: #e2e8f0; /* Crisp light border */
+  --card-bg: #ffffff; /* Clean white card */
+  --sidebar-bg: #ffffff; /* Solid white sidebar */
+  --input-bg: #ffffff;
+  --input-border: #cbd5e1;
+  --accent: #2563eb; /* Untitled UI premium blue */
+  --accent-hover: #1d4ed8;
+  --accent-glow: rgba(37, 99, 235, 0.08);
+  --active-file-bg: #f0f6ff;
+  --active-file-border: #cbd5e1;
+}
+
+.dark {
+  --background: #09090b; /* Zinc 950 clean black */
+  --text: #f4f4f5; /* Zinc 100 text */
+  --text-muted: #a1a1aa; /* Zinc 400 muted text */
+  --border: #27272a; /* Zinc 800 crisp dark border */
+  --card-bg: #09090b; /* Pure black cards */
+  --sidebar-bg: #09090b; /* Pure black sidebar */
+  --input-bg: #09090b;
+  --input-border: #27272a;
+  --accent: #3b82f6; /* Luminous blue accent */
+  --accent-hover: #60a5fa;
+  --accent-glow: rgba(59, 130, 246, 0.15);
+  --active-file-bg: #172554;
+  --active-file-border: #1e3a8a;
+}
+
+@layer base {
+  body {
+    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    user-select: none;
+    cursor: default;
+    background-color: var(--background);
+    color: var(--text);
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  /* Premium minimalist scrollbars */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--accent);
+  }
+
+  /* Custom checkbox style */
+  input[type="checkbox"] {
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border: 1px solid var(--input-border);
+    border-radius: 4px;
+    outline: none;
+    background-color: var(--input-bg);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    transition: all 0.15s ease-in-out;
+  }
+
+  input[type="checkbox"]:checked {
+    background-color: var(--accent);
+    border-color: var(--accent);
+  }
+
+  input[type="checkbox"]:checked::after {
+    content: "";
+    display: block;
+    width: 4px;
+    height: 8px;
+    border: solid #ffffff;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+    position: absolute;
+    top: 1px;
+    left: 4px;
+  }
+
+  input[type="checkbox"]:focus-visible {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+}
+
+@layer utilities {
+  .glass-panel {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    transition: all 0.2s ease;
+  }
+
+  .glow-border {
+    box-shadow: none;
+  }
+
+  .input-glass {
+    background: var(--input-bg);
+    border: 1px solid var(--input-border);
+    color: var(--text);
+    border-radius: 6px;
+    transition: all 0.2s ease;
+  }
+
+  .input-glass:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+    outline: none;
+  }
+
+  .btn-primary {
+    background-color: var(--accent);
+    border: 1px solid var(--accent);
+    color: #ffffff !important;
+    font-weight: 500;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+  }
+
+  .btn-primary:hover {
+    background-color: var(--accent-hover);
+    border-color: var(--accent-hover);
+    transform: none;
+  }
+
+  .btn-ghost {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+  }
+
+  .btn-ghost:hover {
+    background: var(--sidebar-bg);
+    border-color: var(--input-border);
+  }
+  
+  .btn-ghost:disabled {
+    opacity: 0.4;
+    pointer-events: none;
+  }
+
+  .active-file-card {
+    background: var(--active-file-bg);
+    border-color: var(--accent);
+    color: var(--text);
+  }
+}
