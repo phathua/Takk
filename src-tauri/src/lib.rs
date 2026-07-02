@@ -83,17 +83,28 @@ fn load_project(path: String) -> Result<LoadProjectResponse, String> {
 fn scan_suggested_projects() -> Result<Vec<types::SuggestedFile>, String> {
     let mut suggestions = Vec::new();
     let mut roots = Vec::new();
-
-    // 1. Thu muc User Profile (C:\Users\<username>)
-    if let Ok(user_profile) = std::env::var("USERPROFILE") {
-        roots.push(PathBuf::from(user_profile));
-    }
-
-    // 2. Quet cac o dia khac (D:\, E:\, F:\, G:\, H:\) neu ton tai
+    // 1. Quet cac o dia khac (D:\, E:\, F:\, G:\, H:\) neu ton tai
     for drive_letter in b'D'..=b'H' {
         let drive_path = PathBuf::from(format!("{}:\\", drive_letter as char));
         if drive_path.exists() && drive_path.is_dir() {
             roots.push(drive_path);
+        }
+    }
+
+    // 2. Thu muc dac biet cua User Profile (Downloads, Documents, Desktop)
+    if let Ok(user_profile) = std::env::var("USERPROFILE") {
+        let user_profile_path = PathBuf::from(user_profile);
+        let downloads = user_profile_path.join("Downloads");
+        if downloads.exists() && downloads.is_dir() {
+            roots.push(downloads);
+        }
+        let documents = user_profile_path.join("Documents");
+        if documents.exists() && documents.is_dir() {
+            roots.push(documents);
+        }
+        let desktop = user_profile_path.join("Desktop");
+        if desktop.exists() && desktop.is_dir() {
+            roots.push(desktop);
         }
     }
 
@@ -317,7 +328,7 @@ fn detect_csv_delimiter(path: &std::path::Path) -> u8 {
     b','
 }
 
-// Command lay du lieu xem truoc 5-10 dong cho moi file
+// Command lay du lieu xem truoc 3-5 dong cho moi file de toi uu toc do
 #[tauri::command]
 async fn get_preview_rows(
     files: Vec<FileConfig>,
@@ -352,9 +363,9 @@ async fn get_preview_rows(
                 .delimiter(delimiter)
                 .from_reader(reader);
 
-            // Chi doc 100 dong dau cho preview
-            let mut raw_rows: Vec<Vec<String>> = Vec::with_capacity(100);
-            for result in rdr.records().take(100) {
+            // Chi doc 20 dong dau cho preview de lay header va vai dong du lieu nhanh hon
+            let mut raw_rows: Vec<Vec<String>> = Vec::with_capacity(20);
+            for result in rdr.records().take(20) {
                 let record = result.map_err(|e| e.to_string())?;
                 raw_rows.push(record.iter().map(|s| s.to_string()).collect());
             }
@@ -375,9 +386,9 @@ async fn get_preview_rows(
             });
 
             if let Ok(range) = workbook.worksheet_range(&sheet) {
-                // Chi doc 100 dong de lay preview
-                let mut raw_rows: Vec<Vec<String>> = Vec::with_capacity(100);
-                for row in range.rows().take(100) {
+                // Chi doc 20 dong de lay preview nham toi uu toc do
+                let mut raw_rows: Vec<Vec<String>> = Vec::with_capacity(20);
+                for row in range.rows().take(20) {
                     raw_rows.push(row.iter().map(|cell| match cell {
                         calamine::Data::String(s) => s.clone(),
                         calamine::Data::Float(f) => f.to_string(),

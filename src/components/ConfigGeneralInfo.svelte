@@ -2,6 +2,7 @@
   import { Info, Tag, Building2, Calendar } from 'lucide-svelte';
   import { fly } from 'svelte/transition';
   import { appState } from '../lib/state.svelte.js';
+  import DatePicker from './ui/DatePicker.svelte';
 
   function selectMapping(file, mapping) {
     file.brand = mapping.brand;
@@ -90,16 +91,7 @@
       <!-- Ngày Tạo -->
       <div>
         <label for="created-at-input" class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5 tracking-wider">Ngày tạo</label>
-        <div class="flex items-center input-glass rounded-lg px-3 py-2">
-          <Calendar size={13} class="text-slate-500 dark:text-slate-400 mr-2 shrink-0" />
-          <input 
-            id="created-at-input"
-            type="text" 
-            bind:value={file.created_at}
-            placeholder="DD/MM/YYYY"
-            class="bg-transparent border-none text-xs w-full focus:outline-none text-slate-800 dark:text-slate-200 font-semibold font-mono placeholder:text-slate-400 dark:placeholder:text-zinc-650"
-          />
-        </div>
+        <DatePicker bind:value={file.created_at} />
       </div>
     </div>
   </div>

@@ -143,6 +143,7 @@ class AppState {
     this.openProjects = [...this.openProjects, newProj];
     this.activeProjectIdx = this.openProjects.length - 1;
     this.loadActiveSlotState();
+    this.scanSuggestions();
   }
 
   closeProjectTab(idx) {
@@ -150,6 +151,7 @@ class AppState {
       this.openProjects = [this.createNewProjectObject(null, "Dự án mới")];
       this.activeProjectIdx = 0;
       this.loadActiveSlotState();
+      this.scanSuggestions();
       return;
     }
 
@@ -653,6 +655,7 @@ class AppState {
   }
 
   async scanSuggestions() {
+    this.addLog("Info", "Đang quét tìm các tệp dự án đề xuất (.bg, .bgx)...", false);
     try {
       const suggestions = await invoke('scan_suggested_projects');
       this.suggestedFiles = suggestions.map(s => ({
@@ -663,8 +666,10 @@ class AppState {
         size: s.size,
         isSuggestion: true
       }));
+      this.addLog("Success", `Đã quét xong đề xuất! Tìm thấy ${this.suggestedFiles.length} tệp dự án.`, false);
     } catch (e) {
       console.error("Lỗi khi quét file đề xuất:", e);
+      this.addLog("Error", `Lỗi khi quét tệp đề xuất: ${e}`, false);
     }
   }
 
