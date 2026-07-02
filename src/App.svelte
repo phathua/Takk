@@ -3,9 +3,11 @@
   import { scale, fade } from 'svelte/transition';
   import { Sliders, RefreshCw, Play, FileUp, Plus, X, Eye } from 'lucide-svelte';
   import { listen } from '@tauri-apps/api/event';
+  import { getCurrentWindow } from '@tauri-apps/api/window';
   
   // Import global state
   import { appState } from './lib/state.svelte.js';
+  import ConfirmModal from './components/ConfirmModal.svelte';
 
   let isGlobalDragOver = $state(false);
 
@@ -135,6 +137,29 @@
       }
     }, 1500);
 
+    // Lắng nghe sự kiện yêu cầu đóng ứng dụng
+    const appWindow = getCurrentWindow();
+    let forceClose = false;
+    const unlistenClose = appWindow.onCloseRequested(async (event) => {
+      if (forceClose) {
+        return;
+      }
+      if (appState.hasAnyDirtyProjects) {
+        event.preventDefault(); // Ngăn chặn hành động đóng ngay lập tức
+        const confirmClose = await appState.confirm({
+          title: "Thoát ứng dụng",
+          message: "Có các thay đổi chưa được lưu trong dự án của bạn. Bạn có chắc chắn muốn thoát ứng dụng không?\nMọi thay đổi chưa lưu sẽ bị mất.",
+          confirmText: "Thoát ứng dụng",
+          cancelText: "Hủy",
+          kind: "danger"
+        });
+        if (confirmClose) {
+          forceClose = true;
+          await appWindow.close(); // Đóng hẳn cửa sổ
+        }
+      }
+    });
+
     const unlistenProgress = listen('progress-update', (event) => {
       const update = event.payload;
       if (update.type === "Progress") {
@@ -143,6 +168,7 @@
       } else if (update.type === "Log") {
         appState.addLog(update.data.level, update.data.message, false);
       } else if (update.type === "FileAdded") {
+        appState.saveHistoryState();
         const fileWithId = { ...update.data, id: crypto.randomUUID() };
         appState.files = [...appState.files, fileWithId];
         if (appState.selectedFileIdx === -1) {
@@ -185,7 +211,31 @@
 
     appState.outputPath = "D:\\bang_gia_gop_takk." + appState.exportFormat;
 
+    const handleKeyDown = (e) => {
+      // Nhận diện MacOS
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const isCmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
+
+      if (isCmdOrCtrl) {
+        if (e.key.toLowerCase() === 'z') {
+          e.preventDefault();
+          if (e.shiftKey) {
+            appState.redo();
+          } else {
+            appState.undo();
+          }
+        } else if (e.key.toLowerCase() === 'y') {
+          e.preventDefault();
+          appState.redo();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
     return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      unlistenClose.then(f => f());
       unlistenProgress.then(f => f());
       unlistenLogs.then(f => f());
       unlistenDragEnter.then(f => f());
@@ -432,5 +482,8 @@
     {formatCurrency}
     onProceed={handleProceedFromPreview}
   />
+
+  <!-- CONFIRM MODAL -->
+  <ConfirmModal />
 
 </div>
