@@ -91,6 +91,20 @@ pub fn pack_project_files(
     })
 }
 
+// Loại bỏ tiền tố số và dấu gạch dưới ở đầu tên file (ví dụ "0_0_HONDA.xlsx" -> "HONDA.xlsx")
+fn strip_index_prefix(file_name: &str) -> &str {
+    let mut current = file_name;
+    while let Some(idx) = current.find('_') {
+        let prefix = &current[..idx];
+        if !prefix.is_empty() && prefix.chars().all(|c| c.is_ascii_digit()) {
+            current = &current[idx + 1..];
+        } else {
+            break;
+        }
+    }
+    current
+}
+
 // Giai nen cac file raw vao thu muc tam va cap nhat duong dan moi
 pub fn unpack_project_files(project: &ProjectFile) -> anyhow::Result<Vec<FileConfig>> {
     let temp_dir = std::env::temp_dir().join("Takk_Projects");
@@ -99,7 +113,8 @@ pub fn unpack_project_files(project: &ProjectFile) -> anyhow::Result<Vec<FileCon
     let mut new_files = Vec::new();
 
     for (i, p_config) in project.files.iter().enumerate() {
-        let unique_name = format!("{}_{}", i, p_config.file_name);
+        let clean_name = strip_index_prefix(&p_config.file_name);
+        let unique_name = format!("{}_{}", i, clean_name);
         let temp_file_path = temp_dir.join(unique_name);
         std::fs::write(&temp_file_path, &p_config.raw_data)?;
 
