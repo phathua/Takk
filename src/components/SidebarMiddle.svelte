@@ -14,6 +14,9 @@
     Loader2,
     AlertTriangle,
     ArrowUpDown,
+    FileX,
+    Undo2,
+    Redo2,
   } from "lucide-svelte";
   import { slide } from "svelte/transition";
   import { flip } from "svelte/animate";
@@ -27,6 +30,34 @@
     const hasMissingMapping = !file.mapping || !file.mapping.product_code || !file.mapping.name || !file.mapping.retail_price;
     return hasMissingInfo || hasMissingMapping;
   };
+
+  const getDisplayName = (path) => {
+    if (!path) return "";
+    const fileName = path.split(/[\\/]/).pop();
+    // Nếu file nằm trong thư mục tạm, loại bỏ tiền tố index (ví dụ "0_HONDA" -> "HONDA")
+    if (path.includes("Takk_Projects") || path.toLowerCase().includes("temp")) {
+      return fileName.replace(/^\d+_/, "");
+    }
+    return fileName;
+  };
+
+  async function handleRemoveInvalidFiles() {
+    const invalidFiles = appState.files.filter(isFileInvalid);
+    if (invalidFiles.length === 0) return;
+
+    const confirmDelete = await appState.confirm({
+      title: "Loại bỏ tệp cấu hình lỗi",
+      message: `Bạn có chắc chắn muốn loại bỏ nhanh ${invalidFiles.length} tệp cấu hình bị lỗi (thiếu Hãng, Nhà cung cấp hoặc chưa ánh xạ các cột bắt buộc) không?\nHành động này có thể hoàn tác bằng Ctrl+Z.`,
+      confirmText: "Loại bỏ",
+      cancelText: "Hủy",
+      kind: "danger"
+    });
+
+    if (confirmDelete) {
+      appState.removeInvalidFiles(invalidFiles.map(f => f.id));
+      appState.showToast("Success", `Đã loại bỏ ${invalidFiles.length} tệp cấu hình lỗi.`);
+    }
+  }
 
   // --- Trang thai keo tha bang pointer events ---
   let draggedIdx = $state(null);
@@ -99,6 +130,7 @@
       const files = [...appState.files];
       const [item] = files.splice(draggedIdx, 1);
       files.splice(hoveredIdx, 0, item);
+      appState.saveHistoryState();
       appState.files = files;
       appState.selectedFileIdx = hoveredIdx;
     }
@@ -258,6 +290,31 @@
       {#if appState.files.length > 0}
         <div class="flex items-center gap-1">
           <button
+            onclick={() => appState.undo()}
+            disabled={appState.historyUndoStack.length === 0}
+            class="p-1 hover:bg-[var(--active-file-bg)] rounded text-[var(--text-muted)] hover:text-[var(--accent)] disabled:opacity-30 disabled:pointer-events-none cursor-pointer transition"
+            title="Hoàn tác (Ctrl+Z)"
+          >
+            <Undo2 size={12} />
+          </button>
+          <button
+            onclick={() => appState.redo()}
+            disabled={appState.historyRedoStack.length === 0}
+            class="p-1 hover:bg-[var(--active-file-bg)] rounded text-[var(--text-muted)] hover:text-[var(--accent)] disabled:opacity-30 disabled:pointer-events-none cursor-pointer transition"
+            title="Làm lại (Ctrl+Y / Ctrl+Shift+Z)"
+          >
+            <Redo2 size={12} />
+          </button>
+          {#if appState.files.some(isFileInvalid)}
+            <button
+              onclick={handleRemoveInvalidFiles}
+              class="p-1 hover:bg-rose-500/10 rounded text-rose-500 cursor-pointer transition animate-pulse"
+              title="Loại bỏ nhanh các tệp lỗi cấu hình"
+            >
+              <FileX size={12} />
+            </button>
+          {/if}
+          <button
             onclick={() => appState.sortFilesByPriority()}
             class="p-1 hover:bg-[var(--active-file-bg)] rounded text-[var(--accent)] cursor-pointer transition"
             title="Sắp xếp theo thứ tự ưu tiên"
@@ -366,7 +423,7 @@
                 {#if isFileInvalid(file)}
                   <AlertTriangle size={12} class="text-rose-500 shrink-0" />
                 {/if}
-                <span class="truncate">{file.path.split(/[\\/]/).pop()}</span>
+                <span class="truncate">{getDisplayName(file.path)}</span>
               </div>
 
               <div class="flex items-center gap-2 flex-wrap">
