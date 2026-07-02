@@ -404,7 +404,7 @@ pub fn run() {
             // Nhap dup mo file tu instance thu hai
             if args.len() > 1 {
                 let file_path = &args[1];
-                if file_path.ends_with(".bg") {
+                if file_path.ends_with(".bg") || file_path.ends_with(".bgx") {
                     crate::applog!("INFO", "[SingleInstance] Nhan file tu instance khac: {}", file_path);
                     let _ = app.emit("open-project-tab", file_path);
                 }
@@ -422,7 +422,7 @@ pub fn run() {
             let args: Vec<String> = std::env::args().collect();
             if args.len() > 1 {
                 let file_path = &args[1];
-                if file_path.ends_with(".bg") {
+                if file_path.ends_with(".bg") || file_path.ends_with(".bgx") {
                     let handle = app.handle().clone();
                     let path_clone = file_path.clone();
                     tauri::async_runtime::spawn(async move {

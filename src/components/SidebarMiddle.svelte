@@ -210,7 +210,7 @@
       <button
         onclick={() => appState.handleOpenProject()}
         class="p-1.5 bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 rounded-md cursor-pointer transition shadow-sm flex items-center justify-center gap-1.5"
-        title="Mở dự án (.bg)"
+        title="Mở dự án (.bgx, .bg)"
       >
         <FolderOpen size={13} />
         {#if !(appState.files.length > 0 || appState.currentProjectPath)}

@@ -474,13 +474,13 @@ class AppState {
         const hh = String(now.getHours()).padStart(2, '0');
         const min = String(now.getMinutes()).padStart(2, '0');
         const ss = String(now.getSeconds()).padStart(2, '0');
-        const defaultName = `Takk_${yyyy}${mm}${dd}_${hh}${min}${ss}.bg`;
+        const defaultName = `Takk_${yyyy}${mm}${dd}_${hh}${min}${ss}.bgx`;
 
         path = await save({
           defaultPath: defaultName,
           filters: [{
-            name: 'Dự án BG',
-            extensions: ['bg']
+            name: 'Dự án Takk (.bgx, .bg)',
+            extensions: ['bgx', 'bg']
           }]
         });
       }
@@ -514,8 +514,8 @@ class AppState {
       const path = await open({
         multiple: false,
         filters: [{
-          name: 'Dự án BG',
-          extensions: ['bg']
+          name: 'Dự án Takk (.bgx, .bg)',
+          extensions: ['bgx', 'bg']
         }]
       });
 

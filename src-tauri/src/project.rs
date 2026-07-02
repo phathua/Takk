@@ -1,7 +1,10 @@
 use crate::types::{FileConfig, ProjectFile, ProjectFileConfig};
 use std::path::Path;
 
-// Luu du an .bg (Postcard + Zstd, nhanh va nho hon bincode+gzip)
+use flate2::read::GzDecoder;
+use std::io::Read;
+
+// Luu du an (Postcard + Zstd, nhanh va nho hon bincode+gzip)
 pub fn save_project_to_file(project: &ProjectFile, path: &Path) -> anyhow::Result<()> {
     let serialized = postcard::to_stdvec(project)?;
     // Level 3: can bang giua toc do nen va ty le nen tot
@@ -10,12 +13,27 @@ pub fn save_project_to_file(project: &ProjectFile, path: &Path) -> anyhow::Resul
     Ok(())
 }
 
-// Tai du an tu file .bg
+// Tai du an tu file .bg (hoac .bgx) co tu dong nhan dien va fallback sang format cu
 pub fn load_project_from_file(path: &Path) -> anyhow::Result<ProjectFile> {
-    let compressed = std::fs::read(path)?;
-    let decompressed = zstd::decode_all(compressed.as_slice())?;
-    let project: ProjectFile = postcard::from_bytes(&decompressed)?;
-    Ok(project)
+    let raw_data = std::fs::read(path)?;
+
+    // 1. Thu dung Zstd + Postcard (Format moi)
+    if let Ok(decompressed) = zstd::decode_all(raw_data.as_slice()) {
+        if let Ok(project) = postcard::from_bytes(&decompressed) {
+            return Ok(project);
+        }
+    }
+
+    // 2. Fallback sang Gzip + Bincode (Format cu cua phien ban 0.0.7 tro ve truoc)
+    let mut decoder = GzDecoder::new(raw_data.as_slice());
+    let mut decompressed = Vec::new();
+    if decoder.read_to_end(&mut decompressed).is_ok() {
+        if let Ok(project) = bincode::deserialize(&decompressed) {
+            return Ok(project);
+        }
+    }
+
+    Err(anyhow::anyhow!("Khong the doc file du an. Dinh dang khong hop le hoac bi hong."))
 }
 
 // Dong goi cac file va cau hinh thanh ProjectFile
