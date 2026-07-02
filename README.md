@@ -8,7 +8,7 @@
 **Takk** là một ứng dụng máy tính (Desktop App) mạnh mẽ và tối ưu được xây dựng trên nền tảng **Tauri v2**, **Rust** và **Svelte 5**. Ứng dụng này giúp chuẩn hóa, ánh xạ (mapping), xử lý và hợp nhất hàng loạt bảng giá từ các định dạng Excel (`.xlsx`, `.xls`) hoặc `.csv` khác nhau thành một file bảng giá tổng hợp duy nhất.
 
 <p align="center">
-  <img src="public/takk.png" alt="Takk - Giao diện ứng dụng" width="40%" style="border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" />
+  <img src="public/takk.webp" alt="Takk - Giao diện ứng dụng" width="40%" style="border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" />
 </p>
 
 ---

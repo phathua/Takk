@@ -20,6 +20,9 @@ class AppState {
   openProjects = $state([]);
   activeProjectIdx = $state(-1);
 
+  // Lịch sử file gần đây
+  recentFiles = $state([]);
+
   constructor() {
     try {
       const savedTheme = localStorage.getItem('takk-theme');
@@ -30,6 +33,9 @@ class AppState {
       console.error("Lỗi khi đọc theme từ localStorage:", e);
     }
     
+    // Tải lịch sử file gần đây từ localStorage
+    this.loadRecentFiles();
+
     // Khoi tao tab mac dinh
     this.lastSavedState = this.serializeCurrentState();
     this.openProjects = [this.createNewProjectObject(null, "Dự án mới")];
@@ -196,6 +202,7 @@ class AppState {
         this.loadActiveSlotState();
       }
       this.addLog("Success", `Đã mở thành công dự án: ${path}`);
+      this.addRecentFile(path, 'project');
     } catch (e) {
       this.addLog("Error", `Lỗi mở dự án từ đường dẫn: ${e}`);
     }
@@ -495,6 +502,7 @@ class AppState {
           this.openProjects[this.activeProjectIdx].name = path.split(/[\\/]/).pop();
           this.openProjects[this.activeProjectIdx].lastSavedState = this.lastSavedState;
         }
+        this.addRecentFile(path, 'project');
       }
     } catch (e) {
       this.addLog("Error", `Lỗi lưu dự án: ${e}`);
@@ -571,6 +579,24 @@ class AppState {
         outputPath: this.outputPath
       });
       this.addLog("Success", result);
+      
+      // Thêm tệp kết quả vào file gần đây
+      if (this.outputPath) {
+        const ext = this.outputPath.split('.').pop().toLowerCase();
+        this.addRecentFile(this.outputPath, ext === 'csv' ? 'csv' : 'excel');
+      }
+      
+      // Thêm các tệp đầu vào vào danh sách file gần đây
+      for (const f of this.files) {
+        if (f.path) {
+          const pathStr = typeof f.path === 'string' ? f.path : f.path.path; // Đảm bảo kiểu string
+          const pathVal = pathStr || '';
+          if (pathVal) {
+            const ext = pathVal.split('.').pop().toLowerCase();
+            this.addRecentFile(pathVal, ext === 'csv' ? 'csv' : 'excel');
+          }
+        }
+      }
     } catch (e) {
       this.addLog("Error", `Lỗi khi xử lý gộp file: ${e}`);
     } finally {
@@ -599,6 +625,54 @@ class AppState {
 
     window.addEventListener("mousemove", handleMouseMove);
     window.addEventListener("mouseup", handleMouseUp);
+  }
+
+  loadRecentFiles() {
+    try {
+      const data = localStorage.getItem('takk-recent-files');
+      if (data) {
+        this.recentFiles = JSON.parse(data);
+      }
+    } catch (e) {
+      console.error("Lỗi khi tải lịch sử file gần đây:", e);
+    }
+  }
+
+  saveRecentFiles() {
+    try {
+      localStorage.setItem('takk-recent-files', JSON.stringify(this.recentFiles));
+    } catch (e) {
+      console.error("Lỗi khi lưu lịch sử file gần đây:", e);
+    }
+  }
+
+  addRecentFile(filePath, type = 'project') {
+    if (!filePath) return;
+    const name = filePath.split(/[\\/]/).pop();
+    const now = Date.now();
+    
+    // Tìm và loại bỏ nếu đã tồn tại để đưa lên đầu
+    let list = this.recentFiles.filter(item => item.path !== filePath);
+    
+    list.unshift({
+      path: filePath,
+      name,
+      type, // 'project' (.bg), 'excel' (.xlsx, .xls), 'csv' (.csv)
+      timestamp: now
+    });
+    
+    // Giới hạn tối đa 20 file gần đây
+    if (list.length > 20) {
+      list = list.slice(0, 20);
+    }
+    
+    this.recentFiles = list;
+    this.saveRecentFiles();
+  }
+
+  clearRecentFiles() {
+    this.recentFiles = [];
+    this.saveRecentFiles();
   }
 }
 

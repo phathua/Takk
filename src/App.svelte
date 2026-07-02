@@ -249,15 +249,90 @@
       {#if appState.selectedFileIdx === -1 || appState.files.length === 0}
         <div 
           in:scale={{ start: 0.96, duration: 300 }}
-          class="h-full flex flex-col items-center justify-center text-slate-500 space-y-4"
+          class="h-full flex flex-col justify-between space-y-8"
         >
-          <div class="relative w-20 h-20 rounded-full bg-zinc-500/5 border border-[var(--border)] flex items-center justify-center text-slate-400 shadow-sm">
-            <Sliders size={32} class="text-[var(--accent)] animate-pulse" />
+          <!-- Center Banner -->
+          <div class="flex flex-col items-center justify-center text-slate-500 space-y-4 pt-12">
+            <div class="relative w-20 h-20 rounded-full bg-zinc-500/5 border border-[var(--border)] flex items-center justify-center text-slate-400 shadow-sm">
+              <Sliders size={32} class="text-[var(--accent)] animate-pulse" />
+            </div>
+            <div class="text-center max-w-sm space-y-1.5">
+              <h3 class="text-sm font-bold text-[var(--text)]">Cấu hình Ánh xạ & Chuẩn hóa</h3>
+              <p class="text-xs text-[var(--text-muted)] leading-relaxed">Chọn một tệp bảng giá ở danh sách bên trái hoặc nhấn thêm file cấu hình mới để bắt đầu thiết lập.</p>
+            </div>
           </div>
-          <div class="text-center max-w-sm space-y-1.5">
-            <h3 class="text-sm font-bold text-[var(--text)]">Cấu hình Ánh xạ & Chuẩn hóa</h3>
-            <p class="text-xs text-[var(--text-muted)] leading-relaxed">Chọn một tệp bảng giá ở danh sách bên trái hoặc nhấn thêm file cấu hình mới để bắt đầu thiết lập.</p>
-          </div>
+
+          <!-- Recent Files / Recommended Section -->
+          {#if appState.recentFiles.length > 0}
+            <div class="border-t border-[var(--border)] pt-8 mt-auto">
+              <div class="flex items-center justify-between mb-4">
+                <h4 class="text-xs font-bold text-[var(--text)] uppercase tracking-wider">Đề xuất & Lịch sử gần đây</h4>
+                <button 
+                  onclick={() => appState.clearRecentFiles()}
+                  class="text-[10px] text-rose-500 hover:underline transition bg-transparent border-none cursor-pointer"
+                >
+                  Xóa lịch sử
+                </button>
+              </div>
+              
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {#each appState.recentFiles.slice(0, 6) as item}
+                  <button
+                    onclick={async () => {
+                      if (item.type === 'project') {
+                        await appState.loadProjectByPath(item.path);
+                      } else {
+                        await appState.addFilesByPaths([item.path]);
+                      }
+                    }}
+                    class="flex items-center gap-3 p-3 rounded-xl border border-[var(--border)] bg-[var(--card-bg)] hover:bg-[var(--active-file-bg)]/40 hover:border-[var(--accent)]/45 text-left transition group cursor-pointer w-full"
+                  >
+                    <!-- Icon representation -->
+                    <div class="p-2 rounded-lg bg-zinc-500/5 shrink-0 transition group-hover:scale-105">
+                      {#if item.type === 'project'}
+                        <img src="/file-association.webp" alt="Takk Project" class="w-6 h-6 object-contain rounded" />
+                      {:else if item.type === 'csv'}
+                        <CsvIcon size={24} class="text-sky-500" />
+                      {:else}
+                        <ExcelIcon size={24} class="text-emerald-500" />
+                      {/if}
+                    </div>
+
+                    <!-- Details -->
+                    <div class="min-w-0 flex-1">
+                      <div class="text-xs font-bold text-[var(--text)] truncate group-hover:text-[var(--accent)] transition-colors">
+                        {item.name}
+                      </div>
+                      <div class="text-[10px] text-[var(--text-muted)] mt-0.5 truncate flex items-center gap-1.5">
+                        <span>
+                          {#if item.type === 'project'}
+                            Dự án Takk
+                          {:else if item.type === 'csv'}
+                            Tệp CSV
+                          {:else}
+                            Tệp Excel
+                          {/if}
+                        </span>
+                        <span class="w-1 h-1 rounded-full bg-slate-500"></span>
+                        <span>
+                          {(() => {
+                            const diff = Date.now() - item.timestamp;
+                            const mins = Math.floor(diff / 60000);
+                            const hours = Math.floor(mins / 60);
+                            const days = Math.floor(hours / 24);
+                            if (mins < 1) return "Vừa xong";
+                            if (mins < 60) return `${mins} phút trước`;
+                            if (hours < 24) return `${hours} giờ trước`;
+                            return `${days} ngày trước`;
+                          })()}
+                        </span>
+                      </div>
+                    </div>
+                  </button>
+                {/each}
+              </div>
+            </div>
+          {/if}
         </div>
       {:else}
         <ConfigGeneralInfo />
