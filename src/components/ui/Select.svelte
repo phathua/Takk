@@ -8,7 +8,8 @@
     options = [], // [{ value, label }]
     placeholder = 'Chọn...',
     class: customClass = '',
-    size = 'md'
+    size = 'md',
+    onchange
   } = $props();
 
   let isOpen = $state(false);
@@ -31,8 +32,12 @@
   };
 
   const selectOption = (optValue) => {
+    const oldValue = value;
     value = optValue;
     isOpen = false;
+    if (onchange && oldValue !== optValue) {
+      onchange(optValue);
+    }
   };
 
   // Dong khi click ra ngoai
