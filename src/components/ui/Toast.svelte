@@ -1,16 +1,16 @@
 <script>
   import { CheckCircle, AlertTriangle, AlertCircle, Info, X } from 'lucide-svelte';
-  import { fly } from 'svelte/transition';
+  import { fly, fade } from 'svelte/transition';
   import { flip } from 'svelte/animate';
   import { appState } from '../../lib/state.svelte.js';
 </script>
 
-{#if appState.toasts.length > 0}
-  <div class="fixed top-6 right-6 z-50 flex flex-col gap-3 max-w-sm pointer-events-none">
-    {#each appState.toasts as toast (toast.id)}
+<div class="fixed top-6 right-6 z-50 flex flex-col gap-3 max-w-sm pointer-events-none">
+  {#each appState.toasts as toast (toast.id)}
+    <div animate:flip={{ duration: 250 }}>
       <div 
-        transition:fly={{ x: 200, y: 0, duration: 300 }}
-        animate:flip={{ duration: 250 }}
+        in:fly={{ x: 200, duration: 300 }}
+        out:fade={{ duration: 150 }}
         class="glass-panel border border-[var(--border)] shadow-xl rounded-xl overflow-hidden flex items-stretch min-w-[320px] max-w-sm pointer-events-auto"
       >
         <!-- Left vertical color accent bar -->
@@ -45,6 +45,6 @@
           </button>
         </div>
       </div>
-    {/each}
-  </div>
-{/if}
+    </div>
+  {/each}
+</div>
