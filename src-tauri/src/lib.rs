@@ -59,7 +59,14 @@ fn save_project(
 fn load_project(path: String) -> Result<LoadProjectResponse, String> {
     applog!("INFO", "Dang doc du an tu: {}", path);
     let project = project::load_project_from_file(&PathBuf::from(&path)).map_err(|e| e.to_string())?;
-    let files = project::unpack_project_files(&project).map_err(|e| e.to_string())?;
+    let mut files = project::unpack_project_files(&project).map_err(|e| e.to_string())?;
+    for file in &mut files {
+        for (col_idx, h) in file.headers.iter_mut().enumerate() {
+            if h.trim().is_empty() {
+                *h = format!("Cột {} (Trống)", col_idx + 1);
+            }
+        }
+    }
     applog!("SUCCESS", "Tai du an thanh cong! So file: {}", files.len());
     Ok(LoadProjectResponse {
         files,

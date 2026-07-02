@@ -113,7 +113,14 @@ pub fn get_sheets_and_headers(path: &Path) -> anyhow::Result<Vec<(Option<String>
         }
         if !rows.is_empty() {
             let header_idx = find_header_row(&rows);
-            let headers = rows[header_idx].iter().map(|s| s.trim().to_string()).collect();
+            let headers = rows[header_idx].iter().enumerate().map(|(col_idx, s)| {
+                let trimmed = s.trim().to_string();
+                if trimmed.is_empty() {
+                    format!("Cột {} (Trống)", col_idx + 1)
+                } else {
+                    trimmed
+                }
+            }).collect();
             results.push((None, headers));
         }
     } else {
@@ -134,7 +141,14 @@ pub fn get_sheets_and_headers(path: &Path) -> anyhow::Result<Vec<(Option<String>
                 }
                 if !rows.is_empty() {
                     let header_idx = find_header_row(&rows);
-                    let headers = rows[header_idx].iter().map(|s| s.trim().to_string()).collect();
+                    let headers = rows[header_idx].iter().enumerate().map(|(col_idx, s)| {
+                        let trimmed = s.trim().to_string();
+                        if trimmed.is_empty() {
+                            format!("Cột {} (Trống)", col_idx + 1)
+                        } else {
+                            trimmed
+                        }
+                    }).collect();
                     results.push((Some(sheet_name), headers));
                 }
             }
