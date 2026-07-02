@@ -30,7 +30,7 @@
   ></div>
 
   <!-- Output Path Area & Console controls -->
-  <div class="px-6 py-2.5 border-b border-[var(--border)] flex items-center justify-between gap-4">
+  <div class="h-10 px-6 border-b border-[var(--border)] flex items-center justify-between gap-4">
     <!-- Left side: Log Toggle -->
     <div class="flex items-center shrink-0">
       <button 

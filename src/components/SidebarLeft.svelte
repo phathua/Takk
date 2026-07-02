@@ -109,14 +109,12 @@
 </script>
 
 <aside
-  class="w-16 flex flex-col items-center py-6 bg-blue-600 dark:bg-[var(--accent)] text-white shrink-0 select-none z-20 shadow-lg justify-between"
+  class="w-16 flex flex-col items-center pb-6 bg-blue-600 dark:bg-[var(--accent)] text-white shrink-0 select-none z-20 shadow-lg justify-between"
 >
-  <!-- Top Icon Box -->
-  <div class="flex flex-col items-center gap-6">
-    <div
-      class="w-10 h-10 flex items-center justify-center"
-    >
-      <HungTayGaLogo size={28} class="text-[var(--accent)]" />
+  <div class="w-full flex flex-col items-center">
+    <!-- Top Logo Box: Cố định h-16 và border-b đồng bộ -->
+    <div class="h-16 w-full flex items-center justify-center border-b border-white/10 dark:border-black/10 shrink-0">
+      <HungTayGaLogo size={28} />
     </div>
 
     <!-- Nav Icons -->
