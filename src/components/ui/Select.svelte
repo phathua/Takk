@@ -7,7 +7,8 @@
     value = $bindable(), 
     options = [], // [{ value, label }]
     placeholder = 'Chọn...',
-    class: customClass = ''
+    class: customClass = '',
+    size = 'md'
   } = $props();
 
   let isOpen = $state(false);
@@ -53,7 +54,7 @@
   <button
     type="button"
     onclick={toggleDropdown}
-    class="w-full flex items-center justify-between input-glass rounded-xl px-3.5 py-2 text-xs text-[var(--text)] font-semibold cursor-pointer hover:bg-slate-500/5 transition"
+    class="w-full flex items-center justify-between input-glass cursor-pointer hover:bg-slate-500/5 transition {size === 'sm' ? 'rounded-md px-2 py-1 text-[10px]' : 'rounded-xl px-3.5 py-2 text-xs'} text-[var(--text)] font-semibold"
   >
     <div class="flex items-center gap-2 truncate">
       {#if selectedOption && selectedOption.icon}
@@ -67,7 +68,8 @@
 
   {#if isOpen}
     <div
-      class="absolute z-50 w-full mt-1 bg-[var(--card-bg)] border border-[var(--border)] rounded-xl shadow-2xl overflow-hidden max-h-72 overflow-y-auto backdrop-blur-xl
+      class="absolute z-50 w-full mt-1 bg-[var(--card-bg)] border border-[var(--border)] shadow-2xl overflow-hidden max-h-72 overflow-y-auto backdrop-blur-xl
+        {size === 'sm' ? 'rounded-md' : 'rounded-xl'}
         {openUpward ? 'bottom-full mb-1' : 'top-full mt-1'}"
     >
       {#if options.length === 0}

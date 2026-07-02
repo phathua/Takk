@@ -78,8 +78,8 @@
     <!-- Log Filters Bar -->
     <div class="flex flex-wrap items-center gap-4 px-6 py-2 bg-zinc-500/5 border-b border-[var(--border)] text-[10px] font-mono">
       <!-- Text Search Filter -->
-      <div class="flex items-center gap-1.5">
-        <span class="font-bold text-[var(--text-muted)]">Lọc:</span>
+      <div class="flex items-center gap-1.5 shrink-0">
+        <span class="font-bold text-[var(--text-muted)] whitespace-nowrap">Lọc:</span>
         <div class="relative w-44">
           <input 
             type="text" 
@@ -92,12 +92,13 @@
       </div>
 
       <!-- Level Filter Dropdown -->
-      <div class="flex items-center gap-1.5">
-        <span class="font-bold text-[var(--text-muted)]">Cấp độ:</span>
+      <div class="flex items-center gap-1.5 shrink-0">
+        <span class="font-bold text-[var(--text-muted)] whitespace-nowrap">Cấp độ:</span>
         <Select 
           bind:value={appState.selectedLevel}
           options={levelOptions}
-          class="w-32"
+          class="w-28"
+          size="sm"
         />
       </div>
     </div>
