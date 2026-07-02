@@ -4,12 +4,30 @@ use std::path::Path;
 use flate2::read::GzDecoder;
 use std::io::Read;
 
-// Luu du an (Postcard + Zstd, nhanh va nho hon bincode+gzip)
+// Luu du an: .bg luu bang bincode+gzip (format cu), .bgx hoac format khac luu bang postcard+zstd (format moi)
 pub fn save_project_to_file(project: &ProjectFile, path: &Path) -> anyhow::Result<()> {
-    let serialized = postcard::to_stdvec(project)?;
-    // Level 3: can bang giua toc do nen va ty le nen tot
-    let compressed = zstd::encode_all(serialized.as_slice(), 3)?;
-    std::fs::write(path, compressed)?;
+    let extension = path.extension()
+        .and_then(|ext| ext.to_str())
+        .map(|ext| ext.to_lowercase());
+
+    if extension.as_deref() == Some("bg") {
+        // Luu dang cu: bincode + gzip (flate2)
+        use flate2::write::GzEncoder;
+        use flate2::Compression;
+        use std::io::Write;
+
+        let serialized = bincode::serialize(project)?;
+        let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+        encoder.write_all(&serialized)?;
+        let compressed = encoder.finish()?;
+        std::fs::write(path, compressed)?;
+    } else {
+        // Luu dang moi: postcard + zstd
+        let serialized = postcard::to_stdvec(project)?;
+        // Level 3: can bang giua toc do nen va ty le nen tot
+        let compressed = zstd::encode_all(serialized.as_slice(), 3)?;
+        std::fs::write(path, compressed)?;
+    }
     Ok(())
 }
 
