@@ -20,7 +20,6 @@
   );
 
   const toggleDropdown = (e) => {
-    e.stopPropagation();
     if (isOpen) {
       isOpen = false;
     } else {

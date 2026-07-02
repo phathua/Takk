@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte';
-  import { scale } from 'svelte/transition';
-  import { Sliders, RefreshCw, Play, FileUp, Plus, X } from 'lucide-svelte';
+  import { scale, fade } from 'svelte/transition';
+  import { Sliders, RefreshCw, Play, FileUp, Plus, X, Eye } from 'lucide-svelte';
   import { listen } from '@tauri-apps/api/event';
   
   // Import global state
@@ -63,6 +63,58 @@
       };
     }
   });
+
+  let showPreviewModal = $state(false);
+  let previewRows = $state([]);
+  let isGeneratingPreview = $state(false);
+  let previewError = $state(null);
+
+  const formatCurrency = (val) => {
+    if (val === undefined || val === null || isNaN(val)) return '-';
+    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val);
+  };
+
+  const handleOpenPreview = async () => {
+    if (appState.files.length === 0) {
+      appState.addLog("Warning", "Vui lòng thêm ít nhất một file cấu hình.");
+      return;
+    }
+
+    for (const f of appState.files) {
+      if (!f.brand.trim() || !f.provider.trim()) {
+        appState.addLog("Warning", `Tệp ${f.path.split(/[\\/]/).pop()} thiếu thông tin Hãng hoặc Nhà cung cấp.`);
+        return;
+      }
+      if (!f.mapping.product_code || !f.mapping.name || !f.mapping.retail_price) {
+        appState.addLog("Warning", `Tệp ${f.path.split(/[\\/]/).pop()} chưa được ánh xạ đầy đủ các cột bắt buộc.`);
+        return;
+      }
+    }
+
+    showPreviewModal = true;
+    isGeneratingPreview = true;
+    previewError = null;
+    previewRows = [];
+
+    try {
+      const { invoke } = await import('@tauri-apps/api/core');
+      const rows = await invoke('get_preview_rows', {
+        files: $state.snapshot(appState.files),
+        limitPerFile: 10
+      });
+      previewRows = rows;
+    } catch (e) {
+      previewError = e.toString();
+      appState.addLog("Error", `Lỗi tạo bản xem trước: ${e}`);
+    } finally {
+      isGeneratingPreview = false;
+    }
+  };
+
+  const handleProceedFromPreview = () => {
+    showPreviewModal = false;
+    appState.handleProcessAndExport();
+  };
 
   let sidebarLeftComponent;
 
@@ -160,15 +212,15 @@
   <main class="flex-1 flex flex-col min-w-0 h-full relative z-10">
     
     <!-- TOP BAR -->
-    <header class="h-16 flex items-center justify-between px-6 bg-[var(--card-bg)] border-b border-[var(--border)] shrink-0 z-20">
-      <div class="flex items-center gap-2">
-        <Sliders size={15} class="text-[var(--accent)]" />
-        <h2 class="text-xs font-bold text-[var(--text)] uppercase tracking-wider">Cấu hình ánh xạ & chuẩn hóa</h2>
+    <header class="h-16 flex items-center justify-between px-4 md:px-6 gap-2 md:gap-4 bg-[var(--card-bg)] border-b border-[var(--border)] shrink-0 z-20">
+      <div class="flex items-center gap-2 min-w-0">
+        <Sliders size={15} class="text-[var(--accent)] shrink-0" />
+        <h2 class="text-xs font-bold text-[var(--text)] uppercase tracking-wider truncate max-w-[120px] sm:max-w-[200px] lg:max-w-none">Cấu hình ánh xạ & chuẩn hóa</h2>
       </div>
 
-      <div class="flex items-center gap-4">
+      <div class="flex items-center gap-2 md:gap-3 shrink-0">
         <div class="flex items-center gap-2">
-          <span class="text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">Định dạng:</span>
+          <span class="text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider hidden xl:inline">Định dạng:</span>
           <Select 
             bind:value={appState.exportFormat} 
             options={[
@@ -178,6 +230,14 @@
             class="w-32"
           />
         </div>
+
+        <button 
+          onclick={handleOpenPreview}
+          disabled={appState.isProcessing || appState.files.length === 0}
+          class="btn-ghost flex items-center gap-2 disabled:opacity-40 disabled:pointer-events-none text-[var(--text)] font-bold text-xs px-4 py-2 rounded-md cursor-pointer transition active:scale-95 shrink-0"
+        >
+          <Eye size={14} /> XEM TRƯỚC
+        </button>
 
         <button 
           onclick={() => appState.handleProcessAndExport()}
@@ -348,5 +408,118 @@
 
   <!-- TOAST NOTIFICATION SYSTEM -->
   <Toast />
+
+  <!-- PREVIEW MODAL -->
+  {#if showPreviewModal}
+    <div 
+      transition:fade={{ duration: 200 }}
+      class="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-[99999] flex items-center justify-center p-4"
+    >
+      <div 
+        transition:scale={{ duration: 250, start: 0.95 }}
+        class="w-full max-w-6xl bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden"
+      >
+        <!-- Modal Header -->
+        <div class="p-6 border-b border-[var(--border)] flex items-center justify-between shrink-0">
+          <div class="space-y-1">
+            <h3 class="text-sm font-bold text-[var(--text)] uppercase tracking-wider flex items-center gap-2">
+              <Eye size={16} class="text-[var(--accent)]" />
+              Xem trước dữ liệu gộp
+            </h3>
+            <p class="text-xs text-[var(--text-muted)]">Xem trước tối đa 10 dòng đầu của từng file đã cấu hình để kiểm tra kết quả chuẩn hóa & mapping.</p>
+          </div>
+          <button 
+            onclick={() => showPreviewModal = false}
+            class="p-2 hover:bg-slate-500/10 rounded-lg text-[var(--text-muted)] hover:text-[var(--text)] cursor-pointer transition"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <!-- Modal Content (Table) -->
+        <div class="flex-1 overflow-y-auto p-6 min-h-[300px] flex flex-col justify-center">
+          {#if isGeneratingPreview}
+            <div class="flex flex-col items-center justify-center py-12 space-y-3">
+              <RefreshCw size={24} class="text-[var(--accent)] animate-spin" />
+              <span class="text-xs text-[var(--text-muted)] font-medium">Đang xử lý dữ liệu xem trước...</span>
+            </div>
+          {:else if previewError}
+            <div class="flex flex-col items-center justify-center py-12 text-center max-w-md mx-auto space-y-3">
+              <div class="w-12 h-12 rounded-full bg-rose-500/10 text-rose-500 flex items-center justify-center">
+                <X size={20} />
+              </div>
+              <h4 class="text-xs font-bold text-[var(--text)]">Không thể tải bản xem trước</h4>
+              <p class="text-xs text-[var(--text-muted)] leading-relaxed">{previewError}</p>
+            </div>
+          {:else if previewRows.length === 0}
+            <div class="flex flex-col items-center justify-center py-12 text-center max-w-sm mx-auto space-y-2">
+              <span class="text-xs text-[var(--text-muted)] italic">Không tìm thấy dữ liệu hợp lệ để hiển thị.</span>
+            </div>
+          {:else}
+            <div class="w-full flex-grow overflow-auto border border-[var(--border)] rounded-xl bg-[var(--background)]">
+              <table class="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr class="bg-slate-500/5 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider border-b border-[var(--border)] sticky top-0 bg-[var(--card-bg)] z-10">
+                    <th class="p-3">Mã sản phẩm</th>
+                    <th class="p-3">Mã cũ/thay thế</th>
+                    <th class="p-3">Tên sản phẩm</th>
+                    <th class="p-3">Hãng</th>
+                    <th class="p-3">Nhà cung cấp</th>
+                    <th class="p-3 text-right">Giá vốn</th>
+                    <th class="p-3 text-right">Giá bán lẻ</th>
+                    <th class="p-3">Đời xe</th>
+                    <th class="p-3">Mã màu</th>
+                    <th class="p-3">Ghi chú</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-[var(--border)]">
+                  {#each previewRows as row}
+                    <tr class="hover:bg-slate-500/5 transition text-[var(--text)] font-semibold">
+                      <td class="p-3 font-mono text-[var(--accent)] font-bold">{row.product_code}</td>
+                      <td class="p-3 text-[var(--text-muted)]">{row.alt_code || '-'}</td>
+                      <td class="p-3 truncate max-w-[200px]" title={row.name}>{row.name}</td>
+                      <td class="p-3">
+                        <span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-zinc-500/10 text-[var(--text-muted)]">{row.brand}</span>
+                      </td>
+                      <td class="p-3 text-[var(--text-muted)]">{row.provider}</td>
+                      <td class="p-3 text-right font-mono text-emerald-600 dark:text-emerald-400 font-bold">{formatCurrency(row.cost_price)}</td>
+                      <td class="p-3 text-right font-mono text-slate-700 dark:text-slate-300">{formatCurrency(row.retail_price)}</td>
+                      <td class="p-3 text-[var(--text-muted)]">{row.model || '-'}</td>
+                      <td class="p-3 text-[var(--text-muted)]">{row.color_code || '-'}</td>
+                      <td class="p-3 text-[var(--text-muted)] truncate max-w-[150px]" title={row.note || ''}>{row.note || '-'}</td>
+                    </tr>
+                  {/each}
+                </tbody>
+              </table>
+            </div>
+          {/if}
+        </div>
+
+        <!-- Modal Footer -->
+        <div class="p-6 border-t border-[var(--border)] flex items-center justify-between shrink-0 bg-slate-500/5">
+          <div class="text-xs text-[var(--text-muted)] font-semibold">
+            {#if !isGeneratingPreview && !previewError && previewRows.length > 0}
+              Tổng số dòng xem trước: <span class="text-[var(--text)] font-bold">{previewRows.length} dòng</span>
+            {/if}
+          </div>
+          <div class="flex items-center gap-3">
+            <button 
+              onclick={() => showPreviewModal = false}
+              class="btn-ghost text-xs font-bold px-4 py-2 rounded-md cursor-pointer transition active:scale-95"
+            >
+              HỦY / ĐIỀU CHỈNH LẠI
+            </button>
+            <button 
+              onclick={handleProceedFromPreview}
+              disabled={isGeneratingPreview || !!previewError || previewRows.length === 0}
+              class="btn-primary flex items-center gap-2 text-white font-bold text-xs px-4 py-2 rounded-md cursor-pointer transition active:scale-95 disabled:opacity-40 disabled:pointer-events-none"
+            >
+              <Play size={12} fill="currentColor" /> TIẾN HÀNH XỬ LÝ
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  {/if}
 
 </div>

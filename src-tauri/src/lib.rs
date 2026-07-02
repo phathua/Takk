@@ -10,6 +10,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use tauri::AppHandle;
 use calamine::{Reader, open_workbook_auto};
+use std::io::BufReader;
 
 pub static APP_HANDLE: std::sync::OnceLock<tauri::AppHandle> = std::sync::OnceLock::new();
 
@@ -77,10 +78,195 @@ fn load_project(path: String) -> Result<LoadProjectResponse, String> {
 
 // Ham chuan hoa ma phu tung
 fn normalize_product_code(code: &str) -> String {
-    code.trim()
-        .replace('-', "")
-        .replace(' ', "")
+    code.chars()
+        .filter(|c| *c != '-' && *c != ' ')
+        .collect::<String>()
         .to_uppercase()
+}
+
+// Precompute map: ten_field -> chi_so_cot_trong_raw_row
+// Tra ve None neu field khong co trong headers
+fn build_field_col_map(file: &FileConfig) -> HashMap<String, usize> {
+    let mut map = HashMap::with_capacity(file.mapping.len());
+    for (field, header_col) in &file.mapping {
+        if let Some(pos) = file.headers.iter().position(|h| h == header_col) {
+            map.insert(field.clone(), pos);
+        }
+    }
+    map
+}
+
+// Lay gia tri o theo ten field tu field_col_map, tra ve &str de tranh clone khong can
+#[inline]
+fn get_field<'a>(row: &'a [String], col_map: &HashMap<String, usize>, field: &str) -> &'a str {
+    col_map.get(field).and_then(|&idx| row.get(idx)).map(|s| s.trim()).unwrap_or("")
+}
+
+// Ham tao PriceRow tu mot raw row, dung chung cho ca preview va export
+fn build_price_row(
+    row: &[String],
+    col_map: &HashMap<String, usize>,
+    file: &FileConfig,
+    now: chrono::DateTime<chrono::Utc>,
+    created_date: Option<chrono::NaiveDate>,
+) -> Option<PriceRow> {
+    let raw_code = get_field(row, col_map, "product_code");
+    if raw_code.is_empty() { return None; }
+
+    // Chuan hoa ma san pham
+    let mut product_code = if file.normalize_basic {
+        normalize_product_code(raw_code)
+    } else {
+        raw_code.to_string()
+    };
+
+    if file.normalize_special && !file.normalize_suffix.is_empty() {
+        product_code = match file.normalize_position {
+            SuffixPosition::Prefix => format!("{}{}", file.normalize_suffix, product_code),
+            SuffixPosition::Suffix => format!("{}{}", product_code, file.normalize_suffix),
+        };
+    }
+
+    let name = get_field(row, col_map, "name").to_string();
+    let alt_code_str = get_field(row, col_map, "alt_code");
+    let note_str = get_field(row, col_map, "note");
+    let model_str = get_field(row, col_map, "model");
+    let color_code_str = get_field(row, col_map, "color_code");
+    let retail_str = get_field(row, col_map, "retail_price");
+    let cost_str = get_field(row, col_map, "cost_price");
+
+    let retail_val = retail_str.parse::<f64>().ok();
+    let mut cost_val = cost_str.parse::<f64>().unwrap_or(0.0);
+
+    if file.generate_cost && file.cost_discount_percent > 0.0 {
+        if let Some(retail) = retail_val {
+            cost_val = retail * (1.0 - file.cost_discount_percent / 100.0);
+        }
+    } else if cost_val == 0.0 {
+        if let Some(retail) = retail_val {
+            cost_val = retail;
+        }
+    }
+
+    let fingerprint = format!("{}-{}-{}-{}", product_code, file.brand, file.provider, name);
+
+    Some(PriceRow {
+        product_code,
+        alt_code: if alt_code_str.is_empty() { None } else { Some(alt_code_str.to_string()) },
+        name,
+        brand: file.brand.clone(),
+        provider: file.provider.clone(),
+        cost_price: cost_val,
+        retail_price: retail_val,
+        note: if note_str.is_empty() { None } else { Some(note_str.to_string()) },
+        model: if model_str.is_empty() { None } else { Some(model_str.to_string()) },
+        color_code: if color_code_str.is_empty() { None } else { Some(color_code_str.to_string()) },
+        created_at: created_date,
+        updated_at: Some(now),
+        fingerprint,
+    })
+}
+
+// Phat hien delimiter tu bytes dau file (khong doc toan bo file)
+fn detect_csv_delimiter(path: &std::path::Path) -> u8 {
+    use std::io::Read;
+    let mut buf = [0u8; 4096];
+    if let Ok(mut f) = std::fs::File::open(path) {
+        let n = f.read(&mut buf).unwrap_or(0);
+        let sample = &buf[..n];
+        let has_tab = sample.contains(&b'\t');
+        let has_comma = sample.contains(&b',');
+        let has_semi = sample.contains(&b';');
+        if has_tab && !has_comma { return b'\t'; }
+        if has_semi && !has_comma { return b';'; }
+    }
+    b','
+}
+
+// Command lay du lieu xem truoc 5-10 dong cho moi file
+#[tauri::command]
+async fn get_preview_rows(
+    files: Vec<FileConfig>,
+    limit_per_file: usize,
+) -> Result<Vec<PriceRow>, String> {
+    crate::applog!("INFO", "Dang lay du lieu xem truoc cho {} file...", files.len());
+    let mut all_rows: Vec<PriceRow> = Vec::with_capacity(files.len() * limit_per_file);
+    // Goi 1 lan ngoai loop de tranh syscall lap lai
+    let now = chrono::Utc::now();
+
+    for file in &files {
+        if !file.path.exists() {
+            crate::applog!("WARN", "File khong ton tai luc xem truoc: {:?}", file.path);
+            continue;
+        }
+
+        // Precompute field->col index 1 lan cho moi file, O(1) lookup per cell
+        let col_map = build_field_col_map(file);
+        // Parse ngay tao 1 lan ngoai vong for rows
+        let created_date = chrono::NaiveDate::parse_from_str(&file.created_at, "%d/%m/%Y").ok();
+
+        let ext = file.path.extension().and_then(|s| s.to_str()).unwrap_or_default().to_lowercase();
+
+        if ext == "csv" {
+            // Phat hien delimiter tu 4KB dau file, khong load toan bo
+            let delimiter = detect_csv_delimiter(&file.path);
+            // Stream truc tiep tu file, khong load vao String
+            let f = std::fs::File::open(&file.path).map_err(|e| format!("Loi mo file CSV: {}", e))?;
+            let reader = BufReader::new(f);
+            let mut rdr = csv::ReaderBuilder::new()
+                .has_headers(false)
+                .delimiter(delimiter)
+                .from_reader(reader);
+
+            // Chi doc 100 dong dau cho preview
+            let mut raw_rows: Vec<Vec<String>> = Vec::with_capacity(100);
+            for result in rdr.records().take(100) {
+                let record = result.map_err(|e| e.to_string())?;
+                raw_rows.push(record.iter().map(|s| s.to_string()).collect());
+            }
+
+            if raw_rows.is_empty() { continue; }
+            let header_idx = worker::find_header_row(&raw_rows);
+
+            for row in raw_rows.into_iter().skip(header_idx + 1).take(limit_per_file) {
+                if let Some(price_row) = build_price_row(&row, &col_map, file, now, created_date) {
+                    all_rows.push(price_row);
+                }
+            }
+        } else {
+            // Excel (xlsx, xls)
+            let mut workbook = open_workbook_auto(&file.path).map_err(|e| e.to_string())?;
+            let sheet = file.sheet_name.clone().unwrap_or_else(|| {
+                workbook.sheet_names().first().cloned().unwrap_or_default()
+            });
+
+            if let Ok(range) = workbook.worksheet_range(&sheet) {
+                // Chi doc 100 dong de lay preview
+                let mut raw_rows: Vec<Vec<String>> = Vec::with_capacity(100);
+                for row in range.rows().take(100) {
+                    raw_rows.push(row.iter().map(|cell| match cell {
+                        calamine::Data::String(s) => s.clone(),
+                        calamine::Data::Float(f) => f.to_string(),
+                        calamine::Data::Int(i) => i.to_string(),
+                        calamine::Data::Bool(b) => b.to_string(),
+                        _ => String::new(),
+                    }).collect());
+                }
+
+                if raw_rows.is_empty() { continue; }
+                let header_idx = worker::find_header_row(&raw_rows);
+
+                for row in raw_rows.into_iter().skip(header_idx + 1).take(limit_per_file) {
+                    if let Some(price_row) = build_price_row(&row, &col_map, file, now, created_date) {
+                        all_rows.push(price_row);
+                    }
+                }
+            }
+        }
+    }
+
+    crate::applog!("SUCCESS", "Lay du lieu xem truoc thanh cong! Tong so dong: {}", all_rows.len());
+    Ok(all_rows)
 }
 
 // Command xu ly va xuat file gop Excel/CSV
@@ -92,55 +278,45 @@ fn process_and_export(
 ) -> Result<String, String> {
     applog!("INFO", "Bat dau gop va xuat {} file...", files.len());
     let mut all_rows: Vec<PriceRow> = Vec::new();
+    let now = chrono::Utc::now();
 
     for (idx, file) in files.iter().enumerate() {
         if !file.path.exists() {
             applog!("WARN", "File khong ton tai: {:?}", file.path);
             continue;
         }
-
         applog!("INFO", "Dang doc file ({}/{}): {:?}", idx + 1, files.len(), file.path.file_name().unwrap_or_default());
-        
-        let mut file_rows = Vec::new();
+
+        // Precompute field->col index va parse date 1 lan cho moi file
+        let col_map = build_field_col_map(file);
+        let created_date = chrono::NaiveDate::parse_from_str(&file.created_at, "%d/%m/%Y").ok();
         let ext = file.path.extension().and_then(|s| s.to_str()).unwrap_or_default().to_lowercase();
 
         // 1. Doc du lieu tu Excel hoac CSV
         if ext == "csv" {
-            let content = worker::read_file_to_string_robust(&file.path)
-                .map_err(|e| format!("Loi doc file CSV: {}", e))?;
-            let mut delimiter = b',';
-            if content.contains('\t') && !content.contains(',') {
-                delimiter = b'\t';
-            } else if content.contains(';') && !content.contains(',') {
-                delimiter = b';';
-            }
-
+            // Phat hien delimiter tu 4KB dau file, khong load toan bo
+            let delimiter = detect_csv_delimiter(&file.path);
+            // Stream truc tiep tu file, khong can load toan bo vao String
+            let f = std::fs::File::open(&file.path).map_err(|e| format!("Loi mo file CSV: {}", e))?;
+            let reader = BufReader::new(f);
             let mut rdr = csv::ReaderBuilder::new()
                 .has_headers(false)
                 .delimiter(delimiter)
-                .from_reader(content.as_bytes());
-            
-            let mut raw_rows = Vec::new();
+                .from_reader(reader);
+
+            let mut raw_rows: Vec<Vec<String>> = Vec::new();
             for result in rdr.records() {
                 let record = result.map_err(|e| e.to_string())?;
-                let r: Vec<String> = record.iter().map(|s| s.to_string()).collect();
-                raw_rows.push(r);
+                raw_rows.push(record.iter().map(|s| s.to_string()).collect());
             }
 
             if raw_rows.is_empty() { continue; }
             let header_idx = worker::find_header_row(&raw_rows);
-            
-            // Map tung hang
-            for row_data in raw_rows.into_iter().skip(header_idx + 1) {
-                let mut mapped_row = HashMap::new();
-                for (field, header_col) in &file.mapping {
-                    if let Some(pos) = file.headers.iter().position(|h| h == header_col) {
-                        if let Some(val) = row_data.get(pos) {
-                            mapped_row.insert(field.clone(), val.trim().to_string());
-                        }
-                    }
+
+            for row in raw_rows.into_iter().skip(header_idx + 1) {
+                if let Some(price_row) = build_price_row(&row, &col_map, file, now, created_date) {
+                    all_rows.push(price_row);
                 }
-                file_rows.push(mapped_row);
             }
         } else {
             // Excel (xlsx, xls)
@@ -150,95 +326,26 @@ fn process_and_export(
             });
 
             if let Ok(range) = workbook.worksheet_range(&sheet) {
-                let mut raw_rows = Vec::new();
+                let mut raw_rows: Vec<Vec<String>> = Vec::new();
                 for row in range.rows() {
-                    let r: Vec<String> = row.iter().map(|cell| match cell {
+                    raw_rows.push(row.iter().map(|cell| match cell {
                         calamine::Data::String(s) => s.clone(),
                         calamine::Data::Float(f) => f.to_string(),
                         calamine::Data::Int(i) => i.to_string(),
                         calamine::Data::Bool(b) => b.to_string(),
                         _ => String::new(),
-                    }).collect();
-                    raw_rows.push(r);
+                    }).collect());
                 }
 
                 if raw_rows.is_empty() { continue; }
                 let header_idx = worker::find_header_row(&raw_rows);
 
-                for row_data in raw_rows.into_iter().skip(header_idx + 1) {
-                    let mut mapped_row = HashMap::new();
-                    for (field, header_col) in &file.mapping {
-                        if let Some(pos) = file.headers.iter().position(|h| h == header_col) {
-                            if let Some(val) = row_data.get(pos) {
-                                mapped_row.insert(field.clone(), val.trim().to_string());
-                            }
-                        }
-                    }
-                    file_rows.push(mapped_row);
-                }
-            }
-        }
-
-        // 2. Chuan hoa va tao doi tuong PriceRow
-        for item in file_rows {
-            let mut product_code = item.get("product_code").cloned().unwrap_or_default();
-            if product_code.is_empty() { continue; }
-
-            // Chuan hoa co ban
-            if file.normalize_basic {
-                product_code = normalize_product_code(&product_code);
-            }
-
-            // Chuan hoa dac biet (Prefix / Suffix)
-            if file.normalize_special && !file.normalize_suffix.is_empty() {
-                match file.normalize_position {
-                    SuffixPosition::Prefix => {
-                        product_code = format!("{}{}", file.normalize_suffix, product_code);
-                    }
-                    SuffixPosition::Suffix => {
-                        product_code = format!("{}{}", product_code, file.normalize_suffix);
+                for row in raw_rows.into_iter().skip(header_idx + 1) {
+                    if let Some(price_row) = build_price_row(&row, &col_map, file, now, created_date) {
+                        all_rows.push(price_row);
                     }
                 }
             }
-
-            let name = item.get("name").cloned().unwrap_or_default();
-            let alt_code = item.get("alt_code").cloned().filter(|s| !s.is_empty());
-            let note = item.get("note").cloned().filter(|s| !s.is_empty());
-            let model = item.get("model").cloned().filter(|s| !s.is_empty());
-            let color_code = item.get("color_code").cloned().filter(|s| !s.is_empty());
-
-            // Tinh toan gia ca
-            let retail_val = item.get("retail_price").and_then(|s| s.parse::<f64>().ok());
-            let mut cost_val = item.get("cost_price").and_then(|s| s.parse::<f64>().ok()).unwrap_or(0.0);
-
-            if file.generate_cost && file.cost_discount_percent > 0.0 {
-                if let Some(retail) = retail_val {
-                    cost_val = retail * (1.0 - file.cost_discount_percent / 100.0);
-                }
-            } else if cost_val == 0.0 {
-                if let Some(retail) = retail_val {
-                    cost_val = retail;
-                }
-            }
-
-            // Tinh toan fingerprint de loai trung
-            let fingerprint = format!("{}-{}-{}-{}", product_code, file.brand, file.provider, name);
-
-            all_rows.push(PriceRow {
-                product_code,
-                alt_code,
-                name,
-                brand: file.brand.clone(),
-                provider: file.provider.clone(),
-                cost_price: cost_val,
-                retail_price: retail_val,
-                note,
-                model,
-                color_code,
-                created_at: chrono::NaiveDate::parse_from_str(&file.created_at, "%d/%m/%Y").ok(),
-                updated_at: Some(chrono::Utc::now()),
-                fingerprint,
-            });
         }
     }
 
@@ -246,7 +353,7 @@ fn process_and_export(
         return Err("Khong co du lieu nao duoc gop.".to_string());
     }
 
-    // 3. Xuat file
+    // 2. Xuat file CSV - ghi truc tiep, khong clone toan bo fields
     let path = PathBuf::from(&output_path);
     let mut wtr = csv::Writer::from_path(&path).map_err(|e| e.to_string())?;
     wtr.write_record([
@@ -254,19 +361,30 @@ fn process_and_export(
         "Giá vốn", "Giá bán lẻ", "Đời xe", "Mã màu", "Ghi chú", "Ngày tạo"
     ]).map_err(|e| e.to_string())?;
 
+    // Dung buffer tam de tranh alloc string tung truong
+    let mut cost_buf = String::new();
+    let mut retail_buf = String::new();
+    let mut date_buf = String::new();
     for r in &all_rows {
+        use std::fmt::Write as _;
+        cost_buf.clear(); let _ = write!(cost_buf, "{}", r.cost_price);
+        retail_buf.clear();
+        if let Some(v) = r.retail_price { let _ = write!(retail_buf, "{}", v); }
+        date_buf.clear();
+        if let Some(d) = r.created_at { let _ = write!(date_buf, "{}", d.format("%d/%m/%Y")); }
+
         wtr.write_record(&[
-            r.product_code.clone(),
-            r.alt_code.clone().unwrap_or_default(),
-            r.name.clone(),
-            r.brand.clone(),
-            r.provider.clone(),
-            r.cost_price.to_string(),
-            r.retail_price.map(|v| v.to_string()).unwrap_or_default(),
-            r.model.clone().unwrap_or_default(),
-            r.color_code.clone().unwrap_or_default(),
-            r.note.clone().unwrap_or_default(),
-            r.created_at.map(|d| d.format("%d/%m/%Y").to_string()).unwrap_or_default(),
+            r.product_code.as_str(),
+            r.alt_code.as_deref().unwrap_or(""),
+            r.name.as_str(),
+            r.brand.as_str(),
+            r.provider.as_str(),
+            cost_buf.as_str(),
+            retail_buf.as_str(),
+            r.model.as_deref().unwrap_or(""),
+            r.color_code.as_deref().unwrap_or(""),
+            r.note.as_deref().unwrap_or(""),
+            date_buf.as_str(),
         ]).map_err(|e| e.to_string())?;
     }
     wtr.flush().map_err(|e| e.to_string())?;
@@ -322,6 +440,7 @@ pub fn run() {
             save_project,
             load_project,
             process_and_export,
+            get_preview_rows,
             updater::check_for_updates,
             updater::download_and_install
         ])

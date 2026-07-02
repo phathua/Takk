@@ -28,7 +28,7 @@
     class="grid grid-cols-2 gap-6"
   >
     <!-- Chuẩn hóa mã -->
-    <div class="glass-panel p-6 shadow-sm space-y-4 relative overflow-hidden">
+    <div class="glass-panel p-6 shadow-sm space-y-4 relative">
       <h2 class="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 border-b border-slate-100 dark:border-zinc-800 pb-3">
         <Sparkles size={14} class="text-blue-600 dark:text-cyan-400" />
         Chuẩn hóa mã phụ tùng

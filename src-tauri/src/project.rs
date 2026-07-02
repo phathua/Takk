@@ -1,27 +1,20 @@
 use crate::types::{FileConfig, ProjectFile, ProjectFileConfig};
-use std::io::{Read, Write};
-use flate2::read::GzDecoder;
-use flate2::write::GzEncoder;
-use flate2::Compression;
 use std::path::Path;
 
-// Luu du an .bg (nen Gzip + Bincode)
+// Luu du an .bg (Postcard + Zstd, nhanh va nho hon bincode+gzip)
 pub fn save_project_to_file(project: &ProjectFile, path: &Path) -> anyhow::Result<()> {
-    let serialized = bincode::serialize(project)?;
-    let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
-    encoder.write_all(&serialized)?;
-    let compressed = encoder.finish()?;
+    let serialized = postcard::to_stdvec(project)?;
+    // Level 3: can bang giua toc do nen va ty le nen tot
+    let compressed = zstd::encode_all(serialized.as_slice(), 3)?;
     std::fs::write(path, compressed)?;
     Ok(())
 }
 
 // Tai du an tu file .bg
 pub fn load_project_from_file(path: &Path) -> anyhow::Result<ProjectFile> {
-    let data = std::fs::read(path)?;
-    let mut decoder = GzDecoder::new(&data[..]);
-    let mut decompressed = Vec::new();
-    decoder.read_to_end(&mut decompressed)?;
-    let project: ProjectFile = bincode::deserialize(&decompressed)?;
+    let compressed = std::fs::read(path)?;
+    let decompressed = zstd::decode_all(compressed.as_slice())?;
+    let project: ProjectFile = postcard::from_bytes(&decompressed)?;
     Ok(project)
 }
 

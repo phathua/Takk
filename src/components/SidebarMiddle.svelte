@@ -12,12 +12,20 @@
     SaveAll,
     GripVertical,
     Loader2,
+    AlertTriangle,
   } from "lucide-svelte";
   import { slide } from "svelte/transition";
   import { flip } from "svelte/animate";
   import { appState } from "../lib/state.svelte.js";
   import CsvIcon from "./icons/CsvIcon.svelte";
   import ExcelIcon from "./icons/ExcelIcon.svelte";
+
+  const isFileInvalid = (file) => {
+    if (!file) return false;
+    const hasMissingInfo = !file.brand || !file.brand.trim() || !file.provider || !file.provider.trim();
+    const hasMissingMapping = !file.mapping || !file.mapping.product_code || !file.mapping.name || !file.mapping.retail_price;
+    return hasMissingInfo || hasMissingMapping;
+  };
 
   // --- Trang thai keo tha bang pointer events ---
   let draggedIdx = $state(null);
@@ -290,15 +298,19 @@
             }}
             class="p-3 rounded-xl border text-left transition duration-200 relative group flex items-start gap-2
               {draggedIdx === idx && isDragging
-              ? 'opacity-30 border-dashed border-[var(--border)] bg-transparent scale-95'
-              : 'cursor-pointer'}
+                ? 'opacity-30 border-dashed border-[var(--border)] bg-transparent scale-95'
+                : 'cursor-pointer'}
               {hoveredIdx === idx && isDragging && draggedIdx !== idx
-              ? 'border-[var(--accent)] bg-[var(--accent-glow)]/30 scale-[1.02] shadow-lg shadow-[var(--accent)]/5'
-              : ''}
-              {appState.selectedFileIdx === idx && draggedIdx !== idx
-              ? 'bg-[var(--active-file-bg)] border-[var(--accent)]/55 shadow-md shadow-[var(--accent)]/5'
-              : draggedIdx !== idx
-                ? 'bg-[var(--card-bg)] border-[var(--border)] hover:bg-[var(--active-file-bg)]/30 hover:border-zinc-500/30'
+                ? 'border-[var(--accent)] bg-[var(--accent-glow)]/30 scale-[1.02] shadow-lg shadow-[var(--accent)]/5'
+                : ''}
+              {draggedIdx !== idx
+                ? isFileInvalid(file)
+                  ? appState.selectedFileIdx === idx
+                    ? 'bg-rose-500/10 border-rose-500 shadow-md shadow-rose-500/5'
+                    : 'bg-rose-500/5 border-rose-500/35 hover:bg-rose-500/10 hover:border-rose-500/55 shadow-sm shadow-rose-500/5'
+                  : appState.selectedFileIdx === idx
+                    ? 'bg-[var(--active-file-bg)] border-[var(--accent)]/55 shadow-md shadow-[var(--accent)]/5'
+                    : 'bg-[var(--card-bg)] border-[var(--border)] hover:bg-[var(--active-file-bg)]/30 hover:border-zinc-500/30'
                 : ''}"
           >
             <!-- Vach chi thi vi tri tha (Drop indicator line) -->
@@ -338,10 +350,13 @@
 
             <div class="min-w-0 flex-1 space-y-1.5">
               <div
-                class="text-xs font-bold truncate text-[var(--text)]"
+                class="text-xs font-bold truncate text-[var(--text)] flex items-center gap-1.5"
                 title={file.path}
               >
-                {file.path.split(/[\\/]/).pop()}
+                {#if isFileInvalid(file)}
+                  <AlertTriangle size={12} class="text-rose-500 shrink-0" />
+                {/if}
+                <span class="truncate">{file.path.split(/[\\/]/).pop()}</span>
               </div>
 
               <div class="flex items-center gap-2 flex-wrap">
