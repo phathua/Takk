@@ -11,6 +11,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { openUrl } from "@tauri-apps/plugin-opener";
   import { listen } from "@tauri-apps/api/event";
+  import HungTayGaLogo from "./icons/HungTayGaLogo.svelte";
 
   let isChecking = $state(false);
 
@@ -113,13 +114,9 @@
   <!-- Top Icon Box -->
   <div class="flex flex-col items-center gap-6">
     <div
-      class="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-md"
+      class="w-10 h-10 flex items-center justify-center"
     >
-      <img
-        src="/takk.svg"
-        alt="Takk Logo"
-        class="w-7 h-7 object-contain"
-      />
+      <HungTayGaLogo size={28} class="text-[var(--accent)]" />
     </div>
 
     <!-- Nav Icons -->

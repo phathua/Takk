@@ -6,6 +6,8 @@
   import { slide } from 'svelte/transition';
   import { flip } from 'svelte/animate';
   import { appState } from '../lib/state.svelte.js';
+  import CsvIcon from './icons/CsvIcon.svelte';
+  import ExcelIcon from './icons/ExcelIcon.svelte';
 
   // --- Trang thai keo tha bang pointer events ---
   let draggedIdx = $state(null);
@@ -152,10 +154,13 @@
       <!-- Mo du an: Highlight bang mau chu dao -->
       <button 
         onclick={() => appState.handleOpenProject()} 
-        class="p-1.5 bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 rounded-md cursor-pointer transition shadow-sm flex items-center justify-center"
+        class="p-1.5 bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90 rounded-md cursor-pointer transition shadow-sm flex items-center justify-center gap-1.5"
         title="Mở dự án (.bg)"
       >
         <FolderOpen size={13} />
+        {#if !(appState.files.length > 0 || appState.currentProjectPath)}
+          <span class="text-xs font-medium pr-1">Mở dự án</span>
+        {/if}
       </button>
 
       {#if appState.files.length > 0 || appState.currentProjectPath}
@@ -255,13 +260,9 @@
                 ? 'text-sky-500/80 group-hover:text-sky-500' 
                 : 'text-emerald-500/80 group-hover:text-emerald-500'}">
               {#if ext === 'csv'}
-                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 512 512" class="w-[15px] h-[15px] fill-current">
-                  <path d="M0 64C0 28.7 28.7 0 64 0h160v128c0 17.7 14.3 32 32 32h128v144H176c-35.3 0-64 28.7-64 64v144H64c-35.3 0-64-28.7-64-64zm384 64H256V0zM200 352h16c22.1 0 40 17.9 40 40v8c0 8.8-7.2 16-16 16s-16-7.2-16-16v-8c0-4.4-3.6-8-8-8h-16c-4.4 0-8 3.6-8 8v80c0 4.4 3.6 8 8 8h16c4.4 0 8-3.6 8-8v-8c0-8.8 7.2-16 16-16s16 7.2 16 16v8c0 22.1-17.9 40-40 40h-16c-22.1 0-40-17.9-40-40v-80c0-22.1 17.9-40 40-40m133.1 0H368c8.8 0 16 7.2 16 16s-7.2 16-16 16h-34.9c-7.2 0-13.1 5.9-13.1 13.1c0 5.2 3 9.9 7.8 12l37.4 16.6c16.3 7.2 26.8 23.4 26.8 41.2c0 24.9-20.2 45.1-45.1 45.1H304c-8.8 0-16-7.2-16-16s7.2-16 16-16h42.9c7.2 0 13.1-5.9 13.1-13.1c0-5.2-3-9.9-7.8-12l-37.4-16.6c-16.3-7.2-26.8-23.4-26.8-41.2c0-24.9 20.2-45.1 45.1-45.1m98.9 0c8.8 0 16 7.2 16 16v31.6c0 23 5.5 45.6 16 66c10.5-20.3 16-42.9 16-66V368c0-8.8 7.2-16 16-16s16 7.2 16 16v31.6c0 34.7-10.3 68.7-29.6 97.6l-5.1 7.7c-3 4.5-8 7.1-13.3 7.1s-10.3-2.7-13.3-7.1l-5.1-7.7c-19.3-28.9-29.6-62.9-29.6-97.6V368c0-8.8 7.2-16 16-16" />
-                </svg>
+                <CsvIcon size={15} />
               {:else}
-                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 384 512" class="w-[15px] h-[15px] fill-current">
-                  <path d="M64 0C28.7 0 0 28.7 0 64v384c0 35.3 28.7 64 64 64h256c35.3 0 64-28.7 64-64V160H256c-17.7 0-32-14.3-32-32V0zm192 0v128h128zM155.7 250.2l36.3 51.9l36.3-51.9c7.6-10.9 22.6-13.5 33.4-5.9s13.5 22.6 5.9 33.4L221.3 344l46.4 66.2c7.6 10.9 5 25.8-5.9 33.4s-25.8 5-33.4-5.9L192 385.8l-36.3 51.9c-7.6 10.9-22.6 13.5-33.4 5.9s-13.5-22.6-5.9-33.4l46.3-66.2l-46.4-66.2c-7.6-10.9-5-25.8 5.9-33.4s25.8-5 33.4 5.9z" />
-                </svg>
+                <ExcelIcon size={15} />
               {/if}
             </div>
 
@@ -347,6 +348,10 @@
       <div class="w-full h-1 bg-zinc-500/10 rounded-full overflow-hidden">
         <div class="h-full bg-gradient-to-r from-cyan-400 to-sky-500 rounded-full transition-all duration-300" style="width: {appState.progressPercent * 100}%"></div>
       </div>
+    </div>
+  {:else}
+    <div class="p-3 text-center text-[10px] text-[var(--text-muted)] border-t border-[var(--border)] shrink-0 select-none">
+      © {new Date().getFullYear()} Hùng Tay Ga
     </div>
   {/if}
 </aside>
