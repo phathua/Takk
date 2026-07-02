@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { open, save } from '@tauri-apps/plugin-dialog';
+import { open, save, ask } from '@tauri-apps/plugin-dialog';
 import { listen } from '@tauri-apps/api/event';
 
 class AppState {
@@ -23,6 +23,79 @@ class AppState {
   // Lịch sử file gần đây
   recentFiles = $state([]);
   suggestedFiles = $state([]);
+
+  // Confirm Modal state toàn cục
+  confirmDialog = $state({
+    show: false,
+    title: "Xác nhận",
+    message: "",
+    confirmText: "Đồng ý",
+    cancelText: "Hủy",
+    kind: "info",
+    resolve: null
+  });
+
+  confirm(options = {}) {
+    return new Promise((resolve) => {
+      this.confirmDialog = {
+        show: true,
+        title: options.title || "Xác nhận",
+        message: options.message || "",
+        confirmText: options.confirmText || "Đồng ý",
+        cancelText: options.cancelText || "Hủy",
+        kind: options.kind || "info",
+        resolve: (result) => {
+          this.confirmDialog.show = false;
+          resolve(result);
+        }
+      };
+    });
+  }
+
+  // Lịch sử undo/redo cho files & mapping
+  historyUndoStack = $state([]);
+  historyRedoStack = $state([]);
+
+  getHistorySnapshot() {
+    return {
+      files: JSON.parse(JSON.stringify(this.files)),
+      selectedFileIdx: this.selectedFileIdx
+    };
+  }
+
+  restoreHistorySnapshot(snapshot) {
+    this.files = snapshot.files;
+    this.selectedFileIdx = snapshot.selectedFileIdx;
+  }
+
+  saveHistoryState() {
+    if (this.historyUndoStack.length >= 50) {
+      this.historyUndoStack.shift();
+    }
+    this.historyUndoStack.push(this.getHistorySnapshot());
+    this.historyRedoStack = [];
+  }
+
+  undo() {
+    if (this.historyUndoStack.length === 0) return;
+    this.historyRedoStack.push(this.getHistorySnapshot());
+    const prev = this.historyUndoStack.pop();
+    this.restoreHistorySnapshot(prev);
+    this.addLog("Info", "Đã hoàn tác (Undo).", false);
+  }
+
+  redo() {
+    if (this.historyRedoStack.length === 0) return;
+    this.historyUndoStack.push(this.getHistorySnapshot());
+    const next = this.historyRedoStack.pop();
+    this.restoreHistorySnapshot(next);
+    this.addLog("Info", "Đã làm lại (Redo).", false);
+  }
+
+  updateMappingField(file, field, value) {
+    this.saveHistoryState();
+    file.mapping[field] = value;
+  }
 
   constructor() {
     try {
@@ -73,6 +146,33 @@ class AppState {
 
   get isProjectDirty() {
     return this.serializeCurrentState() !== this.lastSavedState;
+  }
+
+  isProjectTabDirty(idx) {
+    if (idx === this.activeProjectIdx) {
+      return this.serializeCurrentState() !== this.lastSavedState;
+    }
+    const proj = this.openProjects[idx];
+    if (!proj) return false;
+    const currentState = JSON.stringify(proj.files.map(f => ({
+      brand: f.brand,
+      provider: f.provider,
+      created_at: f.created_at,
+      normalize_basic: f.normalize_basic,
+      normalize_special: f.normalize_special,
+      normalize_position: f.normalize_position,
+      normalize_suffix: f.normalize_suffix,
+      generate_cost: f.generate_cost,
+      cost_discount_percent: f.cost_discount_percent,
+      mapping: f.mapping
+    })));
+    return currentState !== proj.lastSavedState;
+  }
+
+  get hasAnyDirtyProjects() {
+    // Đồng bộ state hiện tại vào active slot trước khi kiểm tra
+    this.saveCurrentStateToActiveSlot();
+    return this.openProjects.some((_, i) => this.isProjectTabDirty(i));
   }
 
   setTheme(newTheme) {
@@ -146,7 +246,43 @@ class AppState {
     this.scanSuggestions();
   }
 
-  closeProjectTab(idx) {
+  async closeProjectTab(idx) {
+    // Lưu tạm state hiện tại trước khi check để đảm bảo so sánh chính xác nhất cho tab active
+    if (idx === this.activeProjectIdx) {
+      this.saveCurrentStateToActiveSlot();
+    }
+
+    const proj = this.openProjects[idx];
+    if (proj) {
+      // Kiểm tra xem dự án ở tab này có bị thay đổi chưa lưu hay không
+      const currentState = JSON.stringify(proj.files.map(f => ({
+        brand: f.brand,
+        provider: f.provider,
+        created_at: f.created_at,
+        normalize_basic: f.normalize_basic,
+        normalize_special: f.normalize_special,
+        normalize_position: f.normalize_position,
+        normalize_suffix: f.normalize_suffix,
+        generate_cost: f.generate_cost,
+        cost_discount_percent: f.cost_discount_percent,
+        mapping: f.mapping
+      })));
+      const isDirty = currentState !== proj.lastSavedState;
+
+      if (isDirty) {
+        const confirmClose = await this.confirm({
+          title: "Đóng dự án",
+          message: `Dự án "${proj.name}" có thay đổi chưa lưu. Bạn có chắc chắn muốn đóng tab này không?\nMọi thay đổi chưa lưu sẽ bị mất.`,
+          confirmText: "Đóng tab",
+          cancelText: "Hủy",
+          kind: "warning"
+        });
+        if (!confirmClose) {
+          return;
+        }
+      }
+    }
+
     if (this.openProjects.length <= 1) {
       this.openProjects = [this.createNewProjectObject(null, "Dự án mới")];
       this.activeProjectIdx = 0;
@@ -155,7 +291,6 @@ class AppState {
       return;
     }
 
-    this.saveCurrentStateToActiveSlot();
     const isClosingActive = (idx === this.activeProjectIdx);
     
     this.openProjects = this.openProjects.filter((_, i) => i !== idx);
@@ -447,11 +582,13 @@ class AppState {
 
   moveFile(idx, direction) {
     if (direction === 'up' && idx > 0) {
+      this.saveHistoryState();
       const temp = this.files[idx];
       this.files[idx] = this.files[idx - 1];
       this.files[idx - 1] = temp;
       this.selectedFileIdx = idx - 1;
     } else if (direction === 'down' && idx < this.files.length - 1) {
+      this.saveHistoryState();
       const temp = this.files[idx];
       this.files[idx] = this.files[idx + 1];
       this.files[idx + 1] = temp;
@@ -459,11 +596,67 @@ class AppState {
     }
   }
 
+  sortFilesByPriority() {
+    if (this.files.length <= 1) return;
+    
+    this.saveHistoryState();
+
+    const selectedFileId = this.selectedFileIdx !== -1 && this.files[this.selectedFileIdx] 
+      ? this.files[this.selectedFileIdx].id 
+      : null;
+
+    const priorities = this.brandMappings;
+
+    const sorted = [...this.files].sort((a, b) => {
+      const posA = priorities.findIndex(mapping => 
+        mapping.brand?.toLowerCase() === a.brand?.toLowerCase() && 
+        mapping.provider?.toLowerCase() === a.provider?.toLowerCase()
+      );
+      const posB = priorities.findIndex(mapping => 
+        mapping.brand?.toLowerCase() === b.brand?.toLowerCase() && 
+        mapping.provider?.toLowerCase() === b.provider?.toLowerCase()
+      );
+
+      const idxA = posA === -1 ? Number.MAX_SAFE_INTEGER : posA;
+      const idxB = posB === -1 ? Number.MAX_SAFE_INTEGER : posB;
+
+      return idxA - idxB;
+    });
+
+    this.files = sorted;
+
+    if (selectedFileId) {
+      this.selectedFileIdx = this.files.findIndex(f => f.id === selectedFileId);
+    }
+    
+    this.addLog("Success", "Đã sắp xếp danh sách file theo danh sách ưu tiên.");
+  }
+
   removeFile(idx) {
+    this.saveHistoryState();
     this.files = this.files.filter((_, i) => i !== idx);
     if (this.selectedFileIdx >= this.files.length) {
       this.selectedFileIdx = this.files.length - 1;
     }
+  }
+
+  removeInvalidFiles(invalidIds) {
+    if (!invalidIds || invalidIds.length === 0) return;
+    this.saveHistoryState();
+    
+    const selectedFileId = this.selectedFileIdx !== -1 && this.files[this.selectedFileIdx]
+      ? this.files[this.selectedFileIdx].id
+      : null;
+
+    this.files = this.files.filter(f => !invalidIds.includes(f.id));
+
+    if (selectedFileId && !invalidIds.includes(selectedFileId)) {
+      this.selectedFileIdx = this.files.findIndex(f => f.id === selectedFileId);
+    } else {
+      this.selectedFileIdx = this.files.length > 0 ? 0 : -1;
+    }
+    
+    this.addLog("Info", `Đã loại bỏ ${invalidIds.length} tệp cấu hình lỗi.`, false);
   }
 
 
@@ -575,31 +768,65 @@ class AppState {
       }
     }
 
+    // Hiển thị hộp thoại chọn đường dẫn xuất file excel/csv trước khi tiến hành
+    let targetPath = "";
+    try {
+      const isXlsx = this.exportFormat === 'xlsx';
+      const now = new Date();
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      const hh = String(now.getHours()).padStart(2, '0');
+      const min = String(now.getMinutes()).padStart(2, '0');
+      const ss = String(now.getSeconds()).padStart(2, '0');
+      const defaultName = `bang_gia_gop_takk_${yyyy}${mm}${dd}_${hh}${min}${ss}.${this.exportFormat}`;
+
+      const selectedPath = await save({
+        defaultPath: defaultName,
+        filters: [{
+          name: isXlsx ? 'Excel (.xlsx)' : 'Bảng giá gộp (.csv)',
+          extensions: [this.exportFormat]
+        }]
+      });
+
+      if (!selectedPath) {
+        this.addLog("Info", "Đã hủy xuất tệp.");
+        return;
+      }
+      targetPath = selectedPath;
+      this.outputPath = selectedPath;
+    } catch (e) {
+      this.addLog("Error", `Lỗi chọn đường dẫn: ${e}`);
+      return;
+    }
+
     this.isProcessing = true;
     try {
       const result = await invoke('process_and_export', {
         files: this.files,
         exportFormat: this.exportFormat,
-        outputPath: this.outputPath
+        outputPath: targetPath
       });
       this.addLog("Success", result);
-      
-      // Thêm tệp kết quả vào file gần đây
-      if (this.outputPath) {
-        const ext = this.outputPath.split('.').pop().toLowerCase();
-        this.addRecentFile(this.outputPath, ext === 'csv' ? 'csv' : 'excel');
-      }
-      
-      // Thêm các tệp đầu vào vào danh sách file gần đây
-      for (const f of this.files) {
-        if (f.path) {
-          const pathStr = typeof f.path === 'string' ? f.path : f.path.path; // Đảm bảo kiểu string
-          const pathVal = pathStr || '';
-          if (pathVal) {
-            const ext = pathVal.split('.').pop().toLowerCase();
-            this.addRecentFile(pathVal, ext === 'csv' ? 'csv' : 'excel');
+
+      // Hỏi người dùng có muốn lưu dự án lại không (nếu có thay đổi cấu hình dự án chưa được lưu)
+      if (this.isProjectDirty) {
+        setTimeout(async () => {
+          try {
+            const shouldSave = await this.confirm({
+              title: "Lưu cấu hình dự án",
+              message: "Xuất file thành công! Bạn có muốn lưu lại cấu hình dự án này không?",
+              confirmText: "Lưu dự án",
+              cancelText: "Không",
+              kind: "info"
+            });
+            if (shouldSave) {
+              await this.handleSaveProject(false);
+            }
+          } catch (err) {
+            console.error("Lỗi khi hỏi lưu dự án:", err);
           }
-        }
+        }, 300);
       }
     } catch (e) {
       this.addLog("Error", `Lỗi khi xử lý gộp file: ${e}`);
