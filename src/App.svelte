@@ -21,6 +21,13 @@
   import CsvIcon from './components/icons/CsvIcon.svelte';
   import ExcelIcon from './components/icons/ExcelIcon.svelte';
 
+  const formatFileSize = (bytes) => {
+    if (bytes === undefined || bytes === null) return '';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
   // Theo dõi và tự động cập nhật theme (dark, light, auto)
   $effect(() => {
     const currentTheme = appState.theme; // Đọc trực tiếp ở đây để Svelte 5 theo dõi phản hồi
@@ -323,7 +330,7 @@
           </div>
 
           <!-- Recent Files / Recommended Section -->
-          {#if appState.recentFiles.length > 0}
+          {#if appState.displayRecentAndSuggestions.length > 0}
             <div class="border-t border-[var(--border)] pt-8 mt-auto">
               <div class="flex items-center justify-between mb-4">
                 <h4 class="text-xs font-bold text-[var(--text)] uppercase tracking-wider">Đề xuất & Lịch sử gần đây</h4>
@@ -336,7 +343,7 @@
               </div>
               
               <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {#each appState.recentFiles.slice(0, 6) as item}
+                {#each appState.displayRecentAndSuggestions.slice(0, 6) as item}
                   <button
                     onclick={async () => {
                       if (item.type === 'project') {
@@ -363,9 +370,11 @@
                       <div class="text-xs font-bold text-[var(--text)] truncate group-hover:text-[var(--accent)] transition-colors">
                         {item.name}
                       </div>
-                      <div class="text-[10px] text-[var(--text-muted)] mt-0.5 truncate flex items-center gap-1.5">
+                      <div class="text-[10px] text-[var(--text-muted)] mt-0.5 truncate flex items-center gap-1.5 flex-wrap">
                         <span>
-                          {#if item.type === 'project'}
+                          {#if item.isSuggestion}
+                            <span class="px-1 py-0.5 text-[8px] bg-amber-500/10 text-amber-600 dark:text-amber-400 font-extrabold rounded shrink-0">ĐỀ XUẤT</span>
+                          {:else if item.type === 'project'}
                             Dự án Takk
                           {:else if item.type === 'csv'}
                             Tệp CSV
@@ -373,6 +382,10 @@
                             Tệp Excel
                           {/if}
                         </span>
+                        {#if item.size}
+                          <span class="w-1 h-1 rounded-full bg-slate-500"></span>
+                          <span class="font-semibold text-zinc-500 dark:text-zinc-400">{formatFileSize(item.size)}</span>
+                        {/if}
                         <span class="w-1 h-1 rounded-full bg-slate-500"></span>
                         <span>
                           {(() => {

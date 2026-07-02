@@ -116,7 +116,7 @@ pub enum LogLevel {
     Warning,
 }
 
-// Cập nhật trạng thái xử lý gửi ve frontend
+// Cap nhat trang thai xu li gui ve frontend
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", content = "data")]
 pub enum ProcessingUpdate {
@@ -124,4 +124,13 @@ pub enum ProcessingUpdate {
     Log { level: LogLevel, message: String },
     FileAdded(FileConfig),
     AddFilesFinished,
+}
+
+// Struct chua thong tin file goi y quet duoc
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SuggestedFile {
+    pub path: String,
+    pub name: String,
+    pub size: u64,
+    pub modified: u64, // Epoch milliseconds
 }

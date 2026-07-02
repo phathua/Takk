@@ -22,6 +22,7 @@ class AppState {
 
   // Lịch sử file gần đây
   recentFiles = $state([]);
+  suggestedFiles = $state([]);
 
   constructor() {
     try {
@@ -35,6 +36,7 @@ class AppState {
     
     // Tải lịch sử file gần đây từ localStorage
     this.loadRecentFiles();
+    this.scanSuggestions();
 
     // Khoi tao tab mac dinh
     this.lastSavedState = this.serializeCurrentState();
@@ -627,45 +629,97 @@ class AppState {
     window.addEventListener("mouseup", handleMouseUp);
   }
 
-  loadRecentFiles() {
+  async loadRecentFiles() {
     try {
       const data = localStorage.getItem('takk-recent-files');
       if (data) {
         this.recentFiles = JSON.parse(data);
+
+        // Quét và cập nhật dung lượng file từ backend
+        const paths = this.recentFiles.map(item => item.path);
+        if (paths.length > 0) {
+          const sizesMap = await invoke('get_files_metadata', { paths });
+          this.recentFiles = this.recentFiles.map(item => {
+            if (sizesMap[item.path] !== undefined) {
+              return { ...item, size: sizesMap[item.path] };
+            }
+            return item;
+          });
+        }
       }
     } catch (e) {
       console.error("Lỗi khi tải lịch sử file gần đây:", e);
     }
   }
 
+  async scanSuggestions() {
+    try {
+      const suggestions = await invoke('scan_suggested_projects');
+      this.suggestedFiles = suggestions.map(s => ({
+        path: s.path,
+        name: s.name,
+        type: 'project',
+        timestamp: s.modified,
+        size: s.size,
+        isSuggestion: true
+      }));
+    } catch (e) {
+      console.error("Lỗi khi quét file đề xuất:", e);
+    }
+  }
+
+  get displayRecentAndSuggestions() {
+    const combined = [...this.recentFiles];
+    for (const sug of this.suggestedFiles) {
+      if (!combined.some(item => item.path === sug.path)) {
+        combined.push(sug);
+      }
+    }
+    // Sắp xếp theo timestamp mới nhất lên đầu
+    return combined.sort((a, b) => b.timestamp - a.timestamp);
+  }
+
   saveRecentFiles() {
     try {
-      localStorage.setItem('takk-recent-files', JSON.stringify(this.recentFiles));
+      // Khi lưu vào localStorage, loại bỏ trường size để tránh lưu thừa thãi
+      const persistList = this.recentFiles.map(({ size, ...rest }) => rest);
+      localStorage.setItem('takk-recent-files', JSON.stringify(persistList));
     } catch (e) {
       console.error("Lỗi khi lưu lịch sử file gần đây:", e);
     }
   }
 
-  addRecentFile(filePath, type = 'project') {
+  async addRecentFile(filePath, type = 'project') {
     if (!filePath) return;
     const name = filePath.split(/[\\/]/).pop();
     const now = Date.now();
-    
+
+    let size = undefined;
+    try {
+      const sizesMap = await invoke('get_files_metadata', { paths: [filePath] });
+      if (sizesMap[filePath] !== undefined) {
+        size = sizesMap[filePath];
+      }
+    } catch (e) {
+      console.error("Lỗi lấy dung lượng file:", e);
+    }
+
     // Tìm và loại bỏ nếu đã tồn tại để đưa lên đầu
     let list = this.recentFiles.filter(item => item.path !== filePath);
-    
+
     list.unshift({
       path: filePath,
       name,
-      type, // 'project' (.bg), 'excel' (.xlsx, .xls), 'csv' (.csv)
-      timestamp: now
+      type, // 'project' (.bgx, .bg), 'excel' (.xlsx, .xls), 'csv' (.csv)
+      timestamp: now,
+      size
     });
-    
+
     // Giới hạn tối đa 20 file gần đây
     if (list.length > 20) {
       list = list.slice(0, 20);
     }
-    
+
     this.recentFiles = list;
     this.saveRecentFiles();
   }

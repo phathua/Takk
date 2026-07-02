@@ -76,6 +76,140 @@ fn load_project(path: String) -> Result<LoadProjectResponse, String> {
     })
 }
 
+// Quet cac file .bg va .bgx tu cac thu muc nguoi dung hay luu (Downloads, Documents, Desktop, cac o dia D, E,...)
+// Thuat toan duoc toi uu hoa bang cach duyet ngan xep (stack-based), gioi han do sau (4),
+// gioi han tong so file (25k), gioi han thoi gian (800ms) va dung blacklist de bo qua cac thu muc nang.
+#[tauri::command]
+fn scan_suggested_projects() -> Result<Vec<types::SuggestedFile>, String> {
+    let mut suggestions = Vec::new();
+    let mut roots = Vec::new();
+
+    // 1. Thu muc User Profile (C:\Users\<username>)
+    if let Ok(user_profile) = std::env::var("USERPROFILE") {
+        roots.push(PathBuf::from(user_profile));
+    }
+
+    // 2. Quet cac o dia khac (D:\, E:\, F:\, G:\, H:\) neu ton tai
+    for drive_letter in b'D'..=b'H' {
+        let drive_path = PathBuf::from(format!("{}:\\", drive_letter as char));
+        if drive_path.exists() && drive_path.is_dir() {
+            roots.push(drive_path);
+        }
+    }
+
+    let start_time = std::time::Instant::now();
+    let max_duration = std::time::Duration::from_millis(800); // Gioi han thoi gian xu ly toi da
+
+    // Danh sach cac thu muc chan de giam tai CPU/RAM
+    let blacklist = [
+        "appdata",
+        "local settings",
+        "application data",
+        "program files",
+        "program files (x86)",
+        "windows",
+        "system32",
+        "node_modules",
+        "target",
+        ".git",
+        ".cargo",
+        ".rustup",
+        ".gemini",
+        "temp",
+        "tmp",
+        "$recycle.bin",
+        "system volume information",
+    ];
+
+    // Ngan xep luu (duong_dan, do_sau)
+    let mut stack = Vec::new();
+    for r in roots {
+        stack.push((r, 0));
+    }
+
+    let mut files_checked = 0;
+
+    while let Some((dir, depth)) = stack.pop() {
+        // Cu moi chu ky kiem tra thoi gian va so luong tệp de ngan chan doc qua tai
+        if start_time.elapsed() > max_duration || files_checked > 25000 {
+            break;
+        }
+
+        // Gioi han do sau quet de tranh di qua sau vao cac thu muc dev/he thong
+        if depth > 4 {
+            continue;
+        }
+
+        if let Ok(entries) = std::fs::read_dir(&dir) {
+            for entry in entries.flatten() {
+                files_checked += 1;
+                let path = entry.path();
+
+                if path.is_dir() {
+                    if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                        let name_lower = name.to_lowercase();
+                        // Bo qua cac thu muc thuoc blacklist hoac bat dau bang dau cham
+                        if blacklist.contains(&name_lower.as_str()) || name.starts_with('.') {
+                            continue;
+                        }
+                        stack.push((path, depth + 1));
+                    }
+                } else if path.is_file() {
+                    if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+                        let ext_lower = ext.to_lowercase();
+                        if ext_lower == "bg" || ext_lower == "bgx" {
+                            if let Ok(metadata) = entry.metadata() {
+                                let size = metadata.len();
+                                if size == 0 {
+                                    continue; // Bo qua file trong
+                                }
+                                let modified = metadata.modified()
+                                    .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e)))
+                                    .map(|d| d.as_millis() as u64)
+                                    .unwrap_or(0);
+
+                                let name = path.file_name()
+                                    .map(|n| n.to_string_lossy().to_string())
+                                    .unwrap_or_default();
+
+                                suggestions.push(types::SuggestedFile {
+                                    path: path.to_string_lossy().to_string(),
+                                    name,
+                                    size,
+                                    modified,
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Sap xep theo thoi gian sua doi giam dan (file moi nhat len dau)
+    suggestions.sort_by(|a, b| b.modified.cmp(&a.modified));
+    // Gioi han toi da 10 goi y tot nhat
+    suggestions.truncate(10);
+
+    Ok(suggestions)
+}
+
+
+// Lay dung luong (metadata size) cho danh sach duong dan truyen vao
+#[tauri::command]
+fn get_files_metadata(paths: Vec<String>) -> HashMap<String, u64> {
+    let mut map = HashMap::new();
+    for p in paths {
+        let path_buf = PathBuf::from(&p);
+        if let Ok(metadata) = std::fs::metadata(&path_buf) {
+            map.insert(p, metadata.len());
+        }
+    }
+    map
+}
+
+
+
 // Ham chuan hoa ma phu tung
 fn normalize_product_code(code: &str) -> String {
     code.chars()
@@ -441,6 +575,8 @@ pub fn run() {
             load_project,
             process_and_export,
             get_preview_rows,
+            scan_suggested_projects,
+            get_files_metadata,
             updater::check_for_updates,
             updater::download_and_install
         ])
