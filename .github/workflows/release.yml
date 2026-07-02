@@ -1,0 +1,83 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  release:
+    permissions:
+      contents: write
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Đảm bảo tải toàn bộ lịch sử để đếm số lượng commit chính xác
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust Cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Bump version
+        run: pnpm bump-version
+
+      - name: Generate Changelog
+        id: changelog
+        shell: pwsh
+        run: |
+          # Lấy tag gần nhất (nếu có)
+          $prevTag = ""
+          try {
+            $prevTag = git describe --tags --abbrev=0 2>$null
+          } catch {}
+          
+          if ($null -eq $prevTag -or $prevTag -eq "") {
+            # Nếu chưa có tag nào, lấy 10 commit gần nhất
+            $commits = git log --oneline --no-merges -n 10
+          } else {
+            # Lấy các commit từ tag gần nhất đến HEAD
+            $commits = git log "$($prevTag.Trim())..HEAD" --oneline --no-merges
+          }
+          
+          if ($null -eq $commits -or $commits -eq "") {
+            $changelog = "* Cập nhật và cải tiến hệ thống."
+          } else {
+            $changelog = ($commits | ForEach-Object { "* $_" }) -join "`n"
+          }
+          
+          # Xuất changelog ra GitHub Output (hỗ trợ nhiều dòng)
+          $EOF = [System.Guid]::NewGuid().ToString()
+          "changelog<<$EOF" >> $env:GITHUB_OUTPUT
+          $changelog >> $env:GITHUB_OUTPUT
+          "$EOF" >> $env:GITHUB_OUTPUT
+
+      - name: Build and Release Tauri App
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: v__VERSION__
+          releaseName: "Takk v__VERSION__"
+          releaseBody: ${{ steps.changelog.outputs.changelog }}
+          releaseDraft: false
+          prerelease: false
+
