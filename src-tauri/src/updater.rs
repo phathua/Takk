@@ -158,6 +158,9 @@ pub async fn download_and_install(app: tauri::AppHandle, url: String) -> Result<
         }
     }
 
+    // Dong file de giai phong file handle tren Windows, tranh loi os error 32
+    drop(file);
+
     crate::applog!("SUCCESS", "[Updater] Da tai xong ban cap nhat. Dang chay trinh cai dat va thoat ung dung...");
 
     // Chay file cai dat va thoat app
@@ -167,3 +170,4 @@ pub async fn download_and_install(app: tauri::AppHandle, url: String) -> Result<
 
     std::process::exit(0);
 }
+
