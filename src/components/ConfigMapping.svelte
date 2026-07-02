@@ -33,17 +33,17 @@
           <!-- Mã phụ tùng -->
           <div>
             <span class="block text-[10px] text-slate-500 dark:text-slate-400 font-bold mb-1.5 uppercase">Mã phụ tùng (*)</span>
-            <Select bind:value={file.mapping.product_code} options={selectOptions} />
+            <Select value={file.mapping.product_code} onchange={(v) => appState.updateMappingField(file, 'product_code', v)} options={selectOptions} />
           </div>
           <!-- Mã cũ -->
           <div>
             <span class="block text-[10px] text-slate-500 dark:text-slate-400 font-bold mb-1.5 uppercase">Mã cũ/thay thế</span>
-            <Select bind:value={file.mapping.alt_code} options={selectOptions} />
+            <Select value={file.mapping.alt_code} onchange={(v) => appState.updateMappingField(file, 'alt_code', v)} options={selectOptions} />
           </div>
           <!-- Tên -->
           <div>
             <span class="block text-[10px] text-slate-500 dark:text-slate-400 font-bold mb-1.5 uppercase">Tên phụ tùng (*)</span>
-            <Select bind:value={file.mapping.name} options={selectOptions} />
+            <Select value={file.mapping.name} onchange={(v) => appState.updateMappingField(file, 'name', v)} options={selectOptions} />
           </div>
         </div>
       </div>
@@ -56,12 +56,12 @@
           <!-- Giá nhập -->
           <div>
             <span class="block text-[10px] text-slate-500 dark:text-slate-400 font-bold mb-1.5 uppercase">Giá vốn/nhập</span>
-            <Select bind:value={file.mapping.cost_price} options={selectOptions} />
+            <Select value={file.mapping.cost_price} onchange={(v) => appState.updateMappingField(file, 'cost_price', v)} options={selectOptions} />
           </div>
           <!-- Giá bán lẻ -->
           <div>
             <span class="block text-[10px] text-slate-500 dark:text-slate-400 font-bold mb-1.5 uppercase">Giá bán lẻ (*)</span>
-            <Select bind:value={file.mapping.retail_price} options={selectOptions} />
+            <Select value={file.mapping.retail_price} onchange={(v) => appState.updateMappingField(file, 'retail_price', v)} options={selectOptions} />
           </div>
         </div>
       </div>
@@ -74,17 +74,17 @@
           <!-- Đời xe -->
           <div>
             <span class="block text-[10px] text-slate-500 dark:text-slate-400 font-bold mb-1.5 uppercase">Đời xe/Model</span>
-            <Select bind:value={file.mapping.model} options={selectOptions} />
+            <Select value={file.mapping.model} onchange={(v) => appState.updateMappingField(file, 'model', v)} options={selectOptions} />
           </div>
           <!-- Mã màu -->
           <div>
             <span class="block text-[10px] text-slate-500 dark:text-slate-400 font-bold mb-1.5 uppercase">Mã màu</span>
-            <Select bind:value={file.mapping.color_code} options={selectOptions} />
+            <Select value={file.mapping.color_code} onchange={(v) => appState.updateMappingField(file, 'color_code', v)} options={selectOptions} />
           </div>
           <!-- Ghi chú -->
           <div>
             <span class="block text-[10px] text-slate-500 dark:text-slate-400 font-bold mb-1.5 uppercase">Ghi chú</span>
-            <Select bind:value={file.mapping.note} options={selectOptions} />
+            <Select value={file.mapping.note} onchange={(v) => appState.updateMappingField(file, 'note', v)} options={selectOptions} />
           </div>
         </div>
       </div>
