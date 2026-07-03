@@ -85,6 +85,44 @@ pub struct ProjectFileV0 {
     pub app_mode: Option<String>,
 }
 
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct FileConfigV1 {
+    pub path: PathBuf,
+    pub sheet_name: Option<String>,
+    pub brand: String,
+    pub provider: String,
+    pub headers: Vec<String>,
+    pub mapping: HashMap<String, String>,
+    pub normalize_basic: bool,
+    pub normalize_special: bool,
+    pub normalize_position: crate::types::SuffixPosition,
+    pub normalize_suffix: String,
+    pub generate_cost: bool,
+    pub cost_discount_percent: f64,
+    pub created_at: String,
+    pub not_found: bool,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct ProjectFileConfigV1 {
+    pub config: FileConfigV1,
+    pub file_name: String,
+    pub extension: String,
+    pub raw_data: Vec<u8>,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct ProjectFileV1 {
+    pub version: u32,
+    pub app_version: String,
+    pub created_at: String,
+    pub files: Vec<ProjectFileConfigV1>,
+    #[serde(default)]
+    pub export_format: Option<String>,
+    #[serde(default)]
+    pub app_mode: Option<String>,
+}
+
 impl From<FileConfigV0> for FileConfig {
     fn from(v0: FileConfigV0) -> Self {
         FileConfig {
@@ -131,6 +169,52 @@ impl From<ProjectFileV0> for ProjectFile {
     }
 }
 
+impl From<FileConfigV1> for FileConfig {
+    fn from(v1: FileConfigV1) -> Self {
+        FileConfig {
+            path: v1.path,
+            sheet_name: v1.sheet_name,
+            brand: v1.brand,
+            provider: v1.provider,
+            headers: v1.headers,
+            mapping: v1.mapping,
+            normalize_basic: v1.normalize_basic,
+            normalize_special: v1.normalize_special,
+            normalize_position: v1.normalize_position,
+            normalize_suffix: v1.normalize_suffix,
+            generate_cost: v1.generate_cost,
+            cost_discount_percent: v1.cost_discount_percent,
+            created_at: v1.created_at,
+            not_found: v1.not_found,
+            file_hash: None,
+        }
+    }
+}
+
+impl From<ProjectFileConfigV1> for ProjectFileConfig {
+    fn from(v1: ProjectFileConfigV1) -> Self {
+        ProjectFileConfig {
+            config: FileConfig::from(v1.config),
+            file_name: v1.file_name,
+            extension: v1.extension,
+            raw_data: v1.raw_data,
+        }
+    }
+}
+
+impl From<ProjectFileV1> for ProjectFile {
+    fn from(v1: ProjectFileV1) -> Self {
+        ProjectFile {
+            version: v1.version,
+            app_version: v1.app_version,
+            created_at: v1.created_at,
+            files: v1.files.into_iter().map(ProjectFileConfig::from).collect(),
+            export_format: v1.export_format,
+            app_mode: v1.app_mode,
+        }
+    }
+}
+
 // Tai du an tu file .bg (hoac .bgx) co tu dong nhan dien va fallback sang format cu
 pub fn load_project_from_file(path: &Path) -> anyhow::Result<ProjectFile> {
     let raw_data = std::fs::read(path)?;
@@ -139,6 +223,9 @@ pub fn load_project_from_file(path: &Path) -> anyhow::Result<ProjectFile> {
     if let Ok(decompressed) = zstd::decode_all(raw_data.as_slice()) {
         if let Ok(project) = postcard::from_bytes::<ProjectFile>(&decompressed) {
             return Ok(project);
+        }
+        if let Ok(project_v1) = postcard::from_bytes::<ProjectFileV1>(&decompressed) {
+            return Ok(ProjectFile::from(project_v1));
         }
         if let Ok(project_v0) = postcard::from_bytes::<ProjectFileV0>(&decompressed) {
             return Ok(ProjectFile::from(project_v0));
@@ -151,6 +238,9 @@ pub fn load_project_from_file(path: &Path) -> anyhow::Result<ProjectFile> {
     if decoder.read_to_end(&mut decompressed).is_ok() {
         if let Ok(project) = bincode::deserialize::<ProjectFile>(&decompressed) {
             return Ok(project);
+        }
+        if let Ok(project_v1) = bincode::deserialize::<ProjectFileV1>(&decompressed) {
+            return Ok(ProjectFile::from(project_v1));
         }
         if let Ok(project_v0) = bincode::deserialize::<ProjectFileV0>(&decompressed) {
             return Ok(ProjectFile::from(project_v0));
@@ -307,3 +397,6 @@ pub fn unpack_project_files(project: &ProjectFile, project_path: &Path) -> anyho
 
     Ok(new_files)
 }
+
+
+
