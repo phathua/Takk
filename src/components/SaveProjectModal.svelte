@@ -35,104 +35,95 @@
   >
     <div 
       transition:scale={{ duration: 200, start: 0.96 }}
-      class="w-full max-w-2xl bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+      class="w-full max-w-xl bg-[var(--card-bg)] border border-[var(--border)] rounded-2xl shadow-2xl overflow-hidden flex flex-col"
       onclick={(e) => e.stopPropagation()}
     >
       <!-- Header -->
-      <div class="px-6 py-4 border-b border-[var(--border)] flex items-center justify-between">
+      <div class="px-5 py-3.5 border-b border-[var(--border)] flex items-center justify-between">
         <div class="flex items-center gap-2">
-          <div class="w-8 h-8 rounded-lg bg-[var(--accent-glow)]/20 text-[var(--accent)] flex items-center justify-center">
+          <div class="w-8 h-8 rounded-lg bg-[var(--accent-glow)]/20 text-[var(--accent)] flex items-center justify-center shrink-0">
             <HelpCircle size={16} />
           </div>
           <div>
-            <h3 class="text-sm font-bold text-[var(--text)]">
+            <h3 class="text-xs font-bold text-[var(--text)]">
               {dialog.saveAs ? 'Lưu thành dự án mới' : 'Lưu dự án mới'}
             </h3>
             <p class="text-[10px] text-[var(--text-muted)]">
-              Chọn định dạng lưu trữ phù hợp với nhu cầu của bạn
+              Chọn định dạng phù hợp với nhu cầu sử dụng của bạn
             </p>
           </div>
         </div>
         <button 
           onclick={handleCancel}
-          class="p-1.5 rounded-lg hover:bg-slate-500/10 text-[var(--text-muted)] hover:text-[var(--text)] transition cursor-pointer"
+          class="p-1 rounded-lg hover:bg-slate-500/10 text-[var(--text-muted)] hover:text-[var(--text)] transition cursor-pointer"
         >
-          <X size={16} />
+          <X size={14} />
         </button>
       </div>
 
       <!-- Content -->
-      <div class="p-6 overflow-y-auto space-y-6 flex-1">
-        <!-- Ảnh minh họa trực quan & So sánh dung lượng -->
-        <div class="relative bg-slate-500/5 border border-[var(--border)] rounded-xl overflow-hidden p-4 flex flex-col md:flex-row items-center gap-4">
-          <div class="w-full md:w-1/2 flex items-center justify-center bg-white/5 dark:bg-black/20 rounded-lg p-2 overflow-hidden border border-zinc-500/10">
-            <img 
-              src="/file-association.webp" 
-              alt="Đề xuất & Lịch sử gần đây" 
-              class="max-h-[100px] object-contain rounded-md"
-            />
-          </div>
-          <div class="w-full md:w-1/2 space-y-2 text-center md:text-left">
-            <div class="text-[10px] uppercase tracking-wider font-bold text-[var(--accent)]">So sánh tối ưu dung lượng</div>
-            <div class="flex items-center justify-center md:justify-start gap-2.5">
-              <span class="text-xs text-slate-400 line-through">Dự án Đóng gói (.bg): 13.8 MB</span>
-              <ArrowRight size={12} class="text-slate-400" />
-              <span class="text-xs font-extrabold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-md">
-                Dự án Tham chiếu (.bgx): 1.1 KB
-              </span>
-            </div>
-            <p class="text-[11px] text-[var(--text-muted)] leading-relaxed">
-              Takk hỗ trợ hai cách thức tổ chức dự án khác nhau giúp bạn tối ưu hóa không gian lưu trữ và dễ dàng chia sẻ dữ liệu khi cần thiết.
-            </p>
+      <div class="p-5 space-y-4">
+        <!-- So sánh nhanh dùng ảnh file-association.webp cực kỳ nhỏ gọn -->
+        <div class="flex items-center gap-3 p-3 bg-slate-500/5 border border-[var(--border)] rounded-xl">
+          <img 
+            src="/file-association.webp" 
+            alt="Files" 
+            class="h-8 object-contain rounded border border-zinc-500/10 bg-white/5 p-0.5 shrink-0"
+          />
+          <div class="text-[11px] leading-relaxed text-[var(--text-muted)]">
+            Định dạng <strong class="text-[var(--accent)]">Tham chiếu (.bgx)</strong> giúp giảm dung lượng tệp lưu trữ từ <span class="line-through">13.8 MB</span> xuống còn <strong class="text-emerald-500">1.1 KB</strong> bằng cách liên kết file thay vì nhân bản dữ liệu.
           </div>
         </div>
 
         <!-- Hai thẻ lựa chọn -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
           <!-- Card BGX -->
           <!-- svelte-ignore a11y_click_events_have_key_events -->
           <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div 
             onclick={() => selectedFormat = 'bgx'}
-            class="group p-5 rounded-xl border-2 cursor-pointer transition-all duration-200 flex flex-col justify-between h-full relative select-none
+            class="group p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 flex flex-col justify-between relative select-none
               {selectedFormat === 'bgx' 
                 ? 'border-[var(--accent)] bg-[var(--accent-glow)]/10 shadow-lg shadow-[var(--accent)]/5' 
                 : 'border-[var(--border)] hover:border-zinc-500/30 bg-[var(--card-bg)] hover:bg-slate-500/5'}"
           >
             {#if selectedFormat === 'bgx'}
-              <div class="absolute top-3 right-3 w-5 h-5 rounded-full bg-[var(--accent)] text-white flex items-center justify-center">
-                <Check size={12} strokeWidth={3} />
+              <div class="absolute top-2.5 right-2.5 w-4 h-4 rounded-full bg-[var(--accent)] text-white flex items-center justify-center">
+                <Check size={10} strokeWidth={3} />
               </div>
             {/if}
 
-            <div class="space-y-3">
+            <div class="space-y-2.5">
               <div class="flex items-center gap-2">
-                <div class="w-8 h-8 rounded-lg flex items-center justify-center
+                <div class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0
                   {selectedFormat === 'bgx' ? 'bg-[var(--accent)] text-white' : 'bg-slate-500/10 text-[var(--text-muted)] group-hover:text-[var(--text)]'}">
-                  <Link size={16} />
+                  <Link size={14} />
                 </div>
                 <div>
-                  <h4 class="text-xs font-bold text-[var(--text)]">Dự án Tham chiếu (.bgx)</h4>
-                  <span class="text-[10px] text-emerald-500 font-semibold bg-emerald-500/10 px-1.5 py-0.5 rounded">Khuyên dùng</span>
+                  <h4 class="text-[11px] font-bold text-[var(--text)]">Dự án Tham chiếu (.bgx)</h4>
+                  <div class="flex items-center gap-1.5 mt-0.5">
+                    <span class="text-[9px] text-emerald-500 font-bold bg-emerald-500/10 px-1 py-0.2 rounded">Khuyên dùng</span>
+                    <span class="text-[9px] text-[var(--text-muted)] font-mono">~1 KB</span>
+                  </div>
                 </div>
               </div>
 
-              <p class="text-[11px] text-[var(--text-muted)] leading-relaxed">
-                Chỉ ghi nhớ cấu hình bảng giá và liên kết đến các file Excel/CSV gốc trên máy tính. Dữ liệu thô không được đóng gói kèm.
+              <p class="text-[10px] text-[var(--text-muted)] leading-relaxed">
+                Chỉ lưu cấu hình mapping và liên kết đường dẫn tệp. Yêu cầu tệp Excel/CSV gốc phải giữ nguyên vị trí trên máy.
               </p>
 
-              <div class="space-y-1.5 pt-2">
-                <div class="text-[10px] font-bold uppercase text-[var(--text)] tracking-wider">Ưu điểm chính:</div>
-                <ul class="text-[11px] text-[var(--text-muted)] space-y-1 list-disc pl-4">
-                  <li>Dung lượng siêu nhẹ (chỉ khoảng <strong class="text-[var(--text)]">1 KB</strong>)</li>
-                  <li>Lưu và mở cực nhanh</li>
-                  <li>Tránh trùng lặp file dữ liệu trên ổ cứng</li>
+              <div class="space-y-1.5">
+                <div class="text-[9px] font-bold uppercase text-[var(--text)] tracking-wider">Đặc điểm chính:</div>
+                <ul class="text-[10px] text-[var(--text-muted)] space-y-1 list-disc pl-3">
+                  <li>Kích thước cực nhỏ (<strong class="text-[var(--text)]">~1.1 KB</strong>)</li>
+                  <li>Lưu và tải ngay lập tức</li>
+                  <li>Không nhân bản file Excel gốc</li>
                 </ul>
               </div>
             </div>
 
-            <div class="mt-4 pt-3 border-t border-[var(--border)] text-[10px] text-[var(--text-muted)]">
-              👉 <strong class="text-[var(--text)]">Phù hợp nhất:</strong> Làm việc hàng ngày trên máy tính cá nhân.
+            <div class="mt-3.5 pt-2.5 border-t border-[var(--border)] text-[9px] text-[var(--text-muted)]">
+              💡 <strong class="text-[var(--text)]">Phù hợp nhất:</strong> Làm việc cá nhân cố định trên máy.
             </div>
           </div>
 
@@ -141,70 +132,73 @@
           <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div 
             onclick={() => selectedFormat = 'bg'}
-            class="group p-5 rounded-xl border-2 cursor-pointer transition-all duration-200 flex flex-col justify-between h-full relative select-none
+            class="group p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 flex flex-col justify-between relative select-none
               {selectedFormat === 'bg' 
                 ? 'border-[var(--accent)] bg-[var(--accent-glow)]/10 shadow-lg shadow-[var(--accent)]/5' 
                 : 'border-[var(--border)] hover:border-zinc-500/30 bg-[var(--card-bg)] hover:bg-slate-500/5'}"
           >
             {#if selectedFormat === 'bg'}
-              <div class="absolute top-3 right-3 w-5 h-5 rounded-full bg-[var(--accent)] text-white flex items-center justify-center">
-                <Check size={12} strokeWidth={3} />
+              <div class="absolute top-2.5 right-2.5 w-4 h-4 rounded-full bg-[var(--accent)] text-white flex items-center justify-center">
+                <Check size={10} strokeWidth={3} />
               </div>
             {/if}
 
-            <div class="space-y-3">
+            <div class="space-y-2.5">
               <div class="flex items-center gap-2">
-                <div class="w-8 h-8 rounded-lg flex items-center justify-center
+                <div class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0
                   {selectedFormat === 'bg' ? 'bg-[var(--accent)] text-white' : 'bg-slate-500/10 text-[var(--text-muted)] group-hover:text-[var(--text)]'}">
-                  <HardDrive size={16} />
+                  <HardDrive size={14} />
                 </div>
                 <div>
-                  <h4 class="text-xs font-bold text-[var(--text)]">Dự án Đóng gói (.bg)</h4>
-                  <span class="text-[10px] text-amber-500 font-semibold bg-amber-500/10 px-1.5 py-0.5 rounded">Tự chứa dữ liệu</span>
+                  <h4 class="text-[11px] font-bold text-[var(--text)]">Dự án Đóng gói (.bg)</h4>
+                  <div class="flex items-center gap-1.5 mt-0.5">
+                    <span class="text-[9px] text-amber-500 font-bold bg-amber-500/10 px-1 py-0.2 rounded">Tự chứa dữ liệu</span>
+                    <span class="text-[9px] text-[var(--text-muted)] font-mono">~13.8 MB</span>
+                  </div>
                 </div>
               </div>
 
-              <p class="text-[11px] text-[var(--text-muted)] leading-relaxed">
-                Đóng gói toàn bộ các file Excel/CSV thô trực tiếp vào bên trong tệp tin dự án. Bạn có thể mở nó ở bất kỳ đâu.
+              <p class="text-[10px] text-[var(--text-muted)] leading-relaxed">
+                Đóng gói bản sao của toàn bộ file Excel/CSV gốc trực tiếp bên trong tệp dự án. Dự án hoàn toàn độc lập.
               </p>
 
-              <div class="space-y-1.5 pt-2">
-                <div class="text-[10px] font-bold uppercase text-[var(--text)] tracking-wider">Ưu điểm chính:</div>
-                <ul class="text-[11px] text-[var(--text-muted)] space-y-1 list-disc pl-4">
-                  <li>Không bao giờ sợ mất liên kết hoặc thiếu tệp tin</li>
-                  <li>Dễ dàng di chuyển dự án giữa các máy tính khác nhau</li>
-                  <li>Sao lưu toàn vẹn mọi dữ liệu đầu vào</li>
+              <div class="space-y-1.5">
+                <div class="text-[9px] font-bold uppercase text-[var(--text)] tracking-wider">Đặc điểm chính:</div>
+                <ul class="text-[10px] text-[var(--text-muted)] space-y-1 list-disc pl-3">
+                  <li>Không bao giờ sợ mất liên kết tệp</li>
+                  <li>Dễ dàng di chuyển dự án qua máy khác</li>
+                  <li>Sao lưu độc lập an toàn</li>
                 </ul>
               </div>
             </div>
 
-            <div class="mt-4 pt-3 border-t border-[var(--border)] text-[10px] text-[var(--text-muted)]">
-              👉 <strong class="text-[var(--text)]">Phù hợp nhất:</strong> Chia sẻ cho đồng nghiệp, gửi email, chuyển máy làm việc.
+            <div class="mt-3.5 pt-2.5 border-t border-[var(--border)] text-[9px] text-[var(--text-muted)]">
+              💡 <strong class="text-[var(--text)]">Phù hợp nhất:</strong> Gửi email, chia sẻ cho người khác.
             </div>
           </div>
         </div>
       </div>
 
       <!-- Footer Actions -->
-      <div class="px-6 py-4 bg-slate-500/5 border-t border-[var(--border)] flex items-center justify-between gap-3 shrink-0">
-        <label class="flex items-center gap-2 cursor-pointer select-none text-[11px] text-[var(--text-muted)] hover:text-[var(--text)]">
+      <div class="px-5 py-3 bg-slate-500/5 border-t border-[var(--border)] flex items-center justify-between gap-3 shrink-0">
+        <label class="flex items-center gap-2 cursor-pointer select-none text-[10px] text-[var(--text-muted)] hover:text-[var(--text)]">
           <input 
             type="checkbox" 
             bind:checked={dontShowAgain}
-            class="accent-[var(--accent)] cursor-pointer"
+            class="accent-[var(--accent)] cursor-pointer w-3 h-3"
           />
-          Không nhắc lại lựa chọn này lần sau
+          Không nhắc lại lựa chọn này
         </label>
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2.5">
           <button 
             onclick={handleCancel}
-            class="px-4 py-2 rounded-lg text-xs font-bold text-[var(--text-muted)] hover:text-[var(--text)] bg-transparent hover:bg-slate-500/10 cursor-pointer transition active:scale-95"
+            class="px-3 py-1.5 rounded-lg text-xs font-bold text-[var(--text-muted)] hover:text-[var(--text)] bg-transparent hover:bg-slate-500/10 cursor-pointer transition active:scale-95"
           >
             Hủy bỏ
           </button>
           <button 
             onclick={handleSelect}
-            class="px-5 py-2 rounded-lg text-xs font-bold text-white bg-[var(--accent)] hover:bg-[var(--accent)]/90 cursor-pointer transition active:scale-95 shadow-md shadow-[var(--accent)]/10"
+            class="px-4 py-1.5 rounded-lg text-xs font-bold text-white bg-[var(--accent)] hover:bg-[var(--accent)]/90 cursor-pointer transition active:scale-95 shadow-md shadow-[var(--accent)]/10"
           >
             Xác nhận & Tiếp tục
           </button>
