@@ -194,7 +194,7 @@
           <input 
             type="checkbox" 
             bind:checked={dontShowAgain}
-            class="accent-[var(--accent)] cursor-pointer w-3 h-3"
+            class="accent-[var(--accent)] cursor-pointer"
           />
           Không nhắc lại lựa chọn này
         </label>
