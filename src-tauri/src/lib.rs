@@ -541,6 +541,16 @@ fn process_and_export(
     Ok(success_msg)
 }
 
+#[tauri::command]
+fn calculate_file_hash(path: String) -> Result<String, String> {
+    let path_buf = PathBuf::from(path);
+    if !path_buf.exists() {
+        return Err("Tệp tin không tồn tại".to_string());
+    }
+    let bytes = std::fs::read(&path_buf).map_err(|e| e.to_string())?;
+    Ok(blake3::hash(&bytes).to_hex().to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -591,7 +601,8 @@ pub fn run() {
             scan_suggested_projects,
             get_files_metadata,
             updater::check_for_updates,
-            updater::download_and_install
+            updater::download_and_install,
+            calculate_file_hash
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

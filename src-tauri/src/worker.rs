@@ -339,6 +339,10 @@ pub fn run_add_files_worker(
                 cost_discount_percent: 0.0,
                 created_at,
                 not_found: false,
+                file_hash: {
+                    let bytes = std::fs::read(&file_path).ok();
+                    bytes.map(|b| blake3::hash(&b).to_hex().to_string())
+                },
             };
 
             let _ = app.emit("progress-update", ProcessingUpdate::Log {
