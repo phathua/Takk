@@ -12,35 +12,93 @@
   import SaveProjectModal from './components/SaveProjectModal.svelte';
 
   let isGlobalDragOver = $state(false);
+
+  // Trạng thái kéo thả tab bằng pointer events
   let draggedTabIdx = $state(null);
+  let hoveredTabIdx = $state(null);
+  let isDraggingTab = $state(false);
 
-  function handleDragStart(e, idx) {
+  // Tọa độ ghost tab
+  let ghostTabX = $state(0);
+  let ghostTabY = $state(0);
+  let ghostTab = $state(null);
+
+  // Offset từ điểm click đến góc trái trên của tab
+  let offsetTabX = 0;
+  let offsetTabY = 0;
+
+  // Danh sách phần tử tab để tính vị trí
+  let tabsListEl = $state(null);
+
+  function getTabIdxFromX(clientX) {
+    if (!tabsListEl) return null;
+    const tabs = [...tabsListEl.querySelectorAll("[data-tab-item]")];
+    for (let i = 0; i < tabs.length; i++) {
+      const rect = tabs[i].getBoundingClientRect();
+      const mid = rect.left + rect.width / 2;
+      if (clientX < mid) return i;
+    }
+    return tabs.length - 1;
+  }
+
+  function onTabPointerDown(e, idx) {
+    // Không kéo nếu click vào nút close X
+    if (e.target.closest("button")) return;
+    e.preventDefault();
+
     draggedTabIdx = idx;
-    e.dataTransfer.effectAllowed = 'move';
+    ghostTab = appState.openProjects[idx];
+
+    const tabEl = e.currentTarget;
+    const rect = tabEl.getBoundingClientRect();
+    offsetTabX = e.clientX - rect.left;
+    offsetTabY = e.clientY - rect.top;
+
+    ghostTabX = e.clientX - offsetTabX;
+    ghostTabY = e.clientY - offsetTabY;
+
+    window.addEventListener("pointermove", onTabPointerMove);
+    window.addEventListener("pointerup", onTabPointerUp);
   }
 
-  function handleDragOver(e, idx) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
+  function onTabPointerMove(e) {
+    if (draggedTabIdx === null) return;
+    isDraggingTab = true;
+    ghostTabX = e.clientX - offsetTabX;
+    ghostTabY = e.clientY - offsetTabY;
+
+    const newHovered = getTabIdxFromX(e.clientX);
+    if (newHovered !== null) hoveredTabIdx = newHovered;
   }
 
-  function handleDrop(e, targetIdx) {
-    e.preventDefault();
-    if (draggedTabIdx !== null && draggedTabIdx !== targetIdx) {
+  function onTabPointerUp(e) {
+    window.removeEventListener("pointermove", onTabPointerMove);
+    window.removeEventListener("pointerup", onTabPointerUp);
+
+    if (
+      isDraggingTab &&
+      draggedTabIdx !== null &&
+      hoveredTabIdx !== null &&
+      draggedTabIdx !== hoveredTabIdx
+    ) {
       const projects = [...appState.openProjects];
       const activeProj = projects[appState.activeProjectIdx];
-      
+
       const [item] = projects.splice(draggedTabIdx, 1);
-      projects.splice(targetIdx, 0, item);
-      
+      projects.splice(hoveredTabIdx, 0, item);
+
       appState.openProjects = projects;
-      
+
       const newActiveIdx = projects.indexOf(activeProj);
       if (newActiveIdx !== -1) {
         appState.activeProjectIdx = newActiveIdx;
       }
     }
+
     draggedTabIdx = null;
+    hoveredTabIdx = null;
+    isDraggingTab = false;
+    ghostTab = null;
   }
 
   // Import components
@@ -106,6 +164,26 @@
     }
   });
 
+  const isFileInvalid = (file) => {
+    if (!file) return false;
+    if (file.not_found) return false; // Lỗi not_found đã được cảnh báo riêng
+    const hasMissingInfo = !file.brand || !file.brand.trim() || !file.provider || !file.provider.trim();
+    const hasMissingMapping = !file.mapping || !file.mapping.product_code || !file.mapping.name || !file.mapping.retail_price;
+    return hasMissingInfo || hasMissingMapping;
+  };
+
+  let filesGroupA = $derived(appState.files.filter(f => !f.not_found && !isFileInvalid(f)));
+  let filesGroupB = $derived(appState.files.filter(f => !f.not_found && isFileInvalid(f)));
+  let filesGroupC = $derived(appState.files.filter(f => f.not_found));
+
+  let hasInvalidConfigFiles = $derived(filesGroupB.length > 0);
+  let hasValidConfigFiles = $derived(filesGroupA.length > 0);
+  let allFilesNotFound = $derived(appState.files.length > 0 && filesGroupA.length === 0 && filesGroupB.length === 0);
+
+  let hasNotFoundFiles = $derived(filesGroupC.length > 0);
+  let hasValidFiles = $derived(filesGroupA.length > 0 || filesGroupB.length > 0);
+
+  let activePreviewFiles = $state([]);
   let showPreviewModal = $state(false);
   let previewRows = $state([]);
   let isGeneratingPreview = $state(false);
@@ -116,32 +194,17 @@
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val);
   };
 
-  const handleOpenPreview = async () => {
-    if (appState.files.length === 0) {
-      appState.addLog("Warning", "Vui lòng thêm ít nhất một file cấu hình.");
-      return;
-    }
-
-    for (const f of appState.files) {
-      if (!f.brand.trim() || !f.provider.trim()) {
-        appState.addLog("Warning", `Tệp ${f.path.split(/[\\/]/).pop()} thiếu thông tin Hãng hoặc Nhà cung cấp.`);
-        return;
-      }
-      if (!f.mapping.product_code || !f.mapping.name || !f.mapping.retail_price) {
-        appState.addLog("Warning", `Tệp ${f.path.split(/[\\/]/).pop()} chưa được ánh xạ đầy đủ các cột bắt buộc.`);
-        return;
-      }
-    }
-
+  const handleOpenPreview = async (targetFiles) => {
     showPreviewModal = true;
     isGeneratingPreview = true;
     previewError = null;
     previewRows = [];
+    activePreviewFiles = targetFiles;
 
     try {
       const { invoke } = await import('@tauri-apps/api/core');
       const rows = await invoke('get_preview_rows', {
-        files: $state.snapshot(appState.files),
+        files: $state.snapshot(targetFiles),
         limitPerFile: 3
       });
       previewRows = rows;
@@ -155,7 +218,86 @@
 
   const handleProceedFromPreview = () => {
     showPreviewModal = false;
-    appState.handleProcessAndExport();
+    appState.handleProcessAndExport(activePreviewFiles);
+  };
+
+  const resolveFilesBeforeAction = async (actionName) => {
+    const isExport = actionName === "export";
+    const actionText = isExport ? "gộp và xuất dữ liệu" : "xem trước dữ liệu";
+
+    const countC = filesGroupC.length; // Số file not_found
+    const countB = filesGroupB.length; // Số file lỗi cấu hình
+
+    // Kịch bản 1: Chỉ có tệp Nhóm A (không có bất kỳ lỗi nào)
+    if (countC === 0 && countB === 0) {
+      return appState.files;
+    }
+
+    // Kịch bản 2: Có Nhóm A + Nhóm C (not_found), không có Nhóm B
+    if (countB === 0 && countC > 0) {
+      const proceed = await appState.confirm({
+        title: "Tệp cấu hình không tồn tại",
+        message: `Dự án có ${countC} tệp không tìm thấy trên hệ thống. Bạn có muốn tiếp tục ${actionText} cho các tệp còn lại không?`,
+        confirmText: "Tiếp tục",
+        cancelText: "Hủy",
+        kind: "warning"
+      });
+      if (!proceed) return null;
+      return filesGroupA;
+    }
+
+    // Kịch bản 3 & 4: Có tệp lỗi cấu hình (Nhóm B), có thể kèm Nhóm C
+    let message = "";
+    if (countC > 0) {
+      message = `Dự án hiện có:\n- ${countC} tệp không tìm thấy trên đĩa (sẽ bị bỏ qua).\n- ${countB} tệp cấu hình bị lỗi (thiếu Hãng/NCC hoặc ánh xạ cột).\n\nBạn muốn xử lý các tệp lỗi cấu hình này như thế nào?`;
+    } else {
+      message = `Dự án có ${countB} tệp cấu hình bị lỗi (thiếu Hãng/NCC hoặc ánh xạ cột).\n\nBạn muốn xử lý các tệp lỗi cấu hình này như thế nào?`;
+    }
+
+    const buttons = [
+      { text: "Bỏ qua (Hủy)", value: "cancel", class: "bg-slate-500/10 hover:bg-slate-500/20 text-[var(--text)] border border-[var(--border)]" }
+    ];
+
+    if (hasValidConfigFiles) {
+      buttons.push({ 
+        text: "Bỏ qua file lỗi", 
+        value: "skip_invalid", 
+        class: "bg-[var(--accent)] hover:bg-[var(--accent)]/90 text-white" 
+      });
+    }
+
+    buttons.push({ 
+      text: "Tiếp tục bắt buộc (Force)", 
+      value: "force", 
+      class: "bg-rose-500 hover:bg-rose-600 text-white" 
+    });
+
+    const choice = await appState.confirm({
+      title: "Xác nhận xử lý tệp lỗi",
+      message,
+      kind: "warning",
+      buttons
+    });
+
+    if (choice === "force") {
+      return [...filesGroupA, ...filesGroupB];
+    } else if (choice === "skip_invalid") {
+      return filesGroupA;
+    }
+
+    return null;
+  };
+
+  const triggerOpenPreview = async () => {
+    const resolved = await resolveFilesBeforeAction("preview");
+    if (!resolved || resolved.length === 0) return;
+    handleOpenPreview(resolved);
+  };
+
+  const triggerProcessAndExport = async () => {
+    const resolved = await resolveFilesBeforeAction("export");
+    if (!resolved || resolved.length === 0) return;
+    appState.handleProcessAndExport(resolved);
   };
 
   let sidebarLeftComponent;
@@ -278,6 +420,33 @@
 </script>
 
 <div class="flex h-screen w-screen bg-[var(--background)] text-[var(--text)] font-sans overflow-hidden relative">
+  <!-- Ghost Tab theo con trỏ -->
+  {#if isDraggingTab && ghostTab}
+    <div
+      class="ghost-tab fixed z-[999] h-8 flex items-center gap-2 px-3 rounded-t-md text-xs font-semibold border border-[var(--accent)] bg-[var(--active-file-bg)] shadow-2xl shadow-[var(--accent)]/20 opacity-90 pointer-events-none select-none max-w-[200px] text-[var(--text)]"
+      style="left: {ghostTabX}px; top: {ghostTabY}px;"
+    >
+      {#if ghostTab.files.length > 0 && (ghostTab.path === null || ghostTab.lastSavedState !== JSON.stringify(ghostTab.files.map(f => ({
+        brand: f.brand,
+        provider: f.provider,
+        created_at: f.created_at,
+        normalize_basic: f.normalize_basic,
+        normalize_special: f.normalize_special,
+        normalize_position: f.normalize_position,
+        normalize_suffix: f.normalize_suffix,
+        generate_cost: f.generate_cost,
+        cost_discount_percent: f.cost_discount_percent,
+        mapping: f.mapping
+      }))))}
+        <span class="w-1.5 h-1.5 rounded-full bg-[var(--accent)] shrink-0" title="Chưa lưu"></span>
+      {/if}
+      <span class="truncate max-w-[120px]" title={ghostTab.path || ghostTab.name}>{ghostTab.name}</span>
+      <div class="p-0.5 rounded-full text-[var(--text-muted)] opacity-0">
+        <X size={10} />
+      </div>
+    </div>
+  {/if}
+
   {#if isGlobalDragOver}
     <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex flex-col items-center justify-center text-white pointer-events-none transition-all duration-300">
       <div class="p-8 rounded-2xl bg-[var(--sidebar-bg)] border border-[var(--border)] flex flex-col items-center justify-center gap-4 text-center max-w-sm shadow-2xl scale-100 transition-transform">
@@ -322,16 +491,16 @@
         </div>
 
         <button 
-          onclick={handleOpenPreview}
-          disabled={appState.isProcessing || appState.files.length === 0}
+          onclick={triggerOpenPreview}
+          disabled={appState.isProcessing || appState.files.length === 0 || allFilesNotFound}
           class="btn-ghost flex items-center gap-2 disabled:opacity-40 disabled:pointer-events-none text-[var(--text)] font-bold text-xs px-4 py-2 rounded-md cursor-pointer transition active:scale-95 shrink-0"
         >
           <Eye size={14} /> XEM TRƯỚC
         </button>
 
         <button 
-          onclick={() => appState.handleProcessAndExport()}
-          disabled={appState.isProcessing || appState.files.length === 0}
+          onclick={triggerProcessAndExport}
+          disabled={appState.isProcessing || appState.files.length === 0 || allFilesNotFound}
           class="btn-primary flex items-center gap-2 disabled:opacity-40 disabled:pointer-events-none text-white font-bold text-xs px-4 py-2 rounded-md cursor-pointer transition active:scale-95 shrink-0"
         >
           {#if appState.isProcessing}
@@ -344,24 +513,46 @@
     </header>
 
     <!-- TAB BAR -->
-    <div class="h-10 flex items-end bg-[var(--sidebar-bg)] border-b border-[var(--border)] px-4 gap-1 shrink-0 overflow-x-auto select-none">
+    <div 
+      bind:this={tabsListEl}
+      class="h-10 flex items-end bg-[var(--sidebar-bg)] border-b border-[var(--border)] px-4 gap-1 shrink-0 overflow-x-auto select-none"
+    >
       {#each appState.openProjects as proj, idx (proj.id)}
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div 
+          data-tab-item
           animate:flip={{ duration: 180 }}
-          role="button"
-          tabindex="0"
-          draggable="true"
-          ondragstart={(e) => handleDragStart(e, idx)}
-          ondragover={(e) => handleDragOver(e, idx)}
-          ondrop={(e) => handleDrop(e, idx)}
-          class="group h-8 flex items-center gap-2 px-3 rounded-t-md text-xs font-semibold border-t border-x cursor-pointer transition-all duration-200 select-none max-w-[200px] outline-none {appState.activeProjectIdx === idx ? 'bg-[var(--background)] border-[var(--border)] text-[var(--text)]' : 'bg-transparent border-transparent text-[var(--text-muted)] hover:bg-[var(--card-bg)]/50'}"
-          onclick={() => appState.switchProjectTab(idx)}
-          onkeydown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              appState.switchProjectTab(idx);
-            }
+          onpointerdown={(e) => onTabPointerDown(e, idx)}
+          class="group h-8 flex items-center gap-2 px-3 rounded-t-md text-xs font-semibold border-t border-x transition-all duration-200 select-none max-w-[200px] outline-none relative
+            {draggedTabIdx === idx && isDraggingTab
+              ? 'opacity-30 border-dashed border-[var(--border)] bg-transparent scale-95'
+              : 'cursor-pointer'}
+            {hoveredTabIdx === idx && isDraggingTab && draggedTabIdx !== idx
+              ? 'border-[var(--accent)] bg-[var(--accent-glow)]/30 scale-[1.02] shadow-lg shadow-[var(--accent)]/5'
+              : ''}
+            {draggedTabIdx !== idx
+              ? appState.activeProjectIdx === idx
+                ? 'bg-[var(--background)] border-[var(--border)] text-[var(--text)]'
+                : 'bg-transparent border-transparent text-[var(--text-muted)] hover:bg-[var(--card-bg)]/50'
+              : ''}"
+          onclick={() => {
+            if (!isDraggingTab) appState.switchProjectTab(idx);
           }}
         >
+          <!-- Vạch chỉ thị vị trí thả (Drop indicator line - Vertical) -->
+          {#if hoveredTabIdx === idx && isDraggingTab && draggedTabIdx !== idx}
+            {#if draggedTabIdx > idx}
+              <div
+                class="absolute top-0 bottom-0 left-0 w-[3px] bg-[var(--accent)] rounded-full z-20 pointer-events-none"
+              ></div>
+            {:else}
+              <div
+                class="absolute top-0 bottom-0 right-0 w-[3px] bg-[var(--accent)] rounded-full z-20 pointer-events-none"
+              ></div>
+            {/if}
+          {/if}
+
           {#if proj.files.length > 0 && (proj.path === null || proj.lastSavedState !== JSON.stringify(proj.files.map(f => ({
             brand: f.brand,
             provider: f.provider,
@@ -518,6 +709,9 @@
     {previewError}
     {formatCurrency}
     onProceed={handleProceedFromPreview}
+    {allFilesNotFound}
+    {hasNotFoundFiles}
+    {hasInvalidConfigFiles}
   />
 
   <!-- CONFIRM MODAL -->
@@ -527,3 +721,10 @@
   <SaveProjectModal />
 
 </div>
+
+<style>
+  .ghost-tab {
+    transform: rotate(1.5deg);
+    transition: none;
+  }
+</style>
