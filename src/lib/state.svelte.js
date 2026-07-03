@@ -64,6 +64,12 @@ class AppState {
   });
 
   async showSaveProjectModal(saveAs = false) {
+    const skipModal = localStorage.getItem('takk_skip_save_format_explanation') === 'true';
+    const preferredFormat = localStorage.getItem('takk_preferred_save_format') || 'bgx';
+    if (skipModal) {
+      return preferredFormat;
+    }
+
     let bgSize = 0;
     let bgxSize = 0;
     try {
