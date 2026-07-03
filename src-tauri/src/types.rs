@@ -21,6 +21,8 @@ pub struct FileConfig {
     pub created_at: String,               // Ngay tao bang gia
     #[serde(default)]
     pub not_found: bool,                  // Danh dau neu khong tim thay file (chi dung cho bgx)
+    #[serde(default)]
+    pub file_hash: Option<String>,
 }
 
 // Cấu hình file dự án khi lưu trữ raw binary

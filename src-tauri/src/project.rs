@@ -91,6 +91,18 @@ pub fn pack_project_files(
             .map(|s| s.to_string_lossy().to_string())
             .unwrap_or_default();
 
+        let file_bytes = if config.path.exists() {
+            std::fs::read(&config.path).ok()
+        } else {
+            None
+        };
+
+        // Tính toán mã băm BLAKE3 của tệp tin
+        let file_hash = file_bytes.as_ref().map(|bytes| {
+            blake3::hash(bytes).to_hex().to_string()
+        });
+        config.file_hash = file_hash;
+
         let raw_data = if is_bgx {
             // Neu la bgx, doi sang duong dan tuong doi neu cung o dia
             if let Some(proj_dir) = project_dir {
@@ -100,11 +112,7 @@ pub fn pack_project_files(
             }
             Vec::new()
         } else {
-            if config.path.exists() {
-                std::fs::read(&config.path)?
-            } else {
-                Vec::new()
-            }
+            file_bytes.unwrap_or_default()
         };
 
         project_configs.push(ProjectFileConfig {
