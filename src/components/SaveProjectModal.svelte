@@ -6,6 +6,7 @@
   // Lấy trạng thái lưu từ appState
   let dialog = $derived(appState.saveProjectDialog);
   let selectedFormat = $state('bgx'); // Mặc định chọn .bgx để quảng bá tiết kiệm dung lượng
+  let dontShowAgain = $state(false);
 
   function handleCancel() {
     if (dialog.resolve) {
@@ -14,6 +15,10 @@
   }
 
   function handleSelect() {
+    if (dontShowAgain) {
+      localStorage.setItem('takk_skip_save_format_explanation', 'true');
+      localStorage.setItem('takk_preferred_save_format', selectedFormat);
+    }
     if (dialog.resolve) {
       dialog.resolve(selectedFormat);
     }
@@ -181,19 +186,29 @@
       </div>
 
       <!-- Footer Actions -->
-      <div class="px-6 py-4 bg-slate-500/5 border-t border-[var(--border)] flex items-center justify-end gap-3 shrink-0">
-        <button 
-          onclick={handleCancel}
-          class="px-4 py-2 rounded-lg text-xs font-bold text-[var(--text-muted)] hover:text-[var(--text)] bg-transparent hover:bg-slate-500/10 cursor-pointer transition active:scale-95"
-        >
-          Hủy bỏ
-        </button>
-        <button 
-          onclick={handleSelect}
-          class="px-5 py-2 rounded-lg text-xs font-bold text-white bg-[var(--accent)] hover:bg-[var(--accent)]/90 cursor-pointer transition active:scale-95 shadow-md shadow-[var(--accent)]/10"
-        >
-          Xác nhận & Tiếp tục
-        </button>
+      <div class="px-6 py-4 bg-slate-500/5 border-t border-[var(--border)] flex items-center justify-between gap-3 shrink-0">
+        <label class="flex items-center gap-2 cursor-pointer select-none text-[11px] text-[var(--text-muted)] hover:text-[var(--text)]">
+          <input 
+            type="checkbox" 
+            bind:checked={dontShowAgain}
+            class="accent-[var(--accent)] cursor-pointer"
+          />
+          Không nhắc lại lựa chọn này lần sau
+        </label>
+        <div class="flex items-center gap-3">
+          <button 
+            onclick={handleCancel}
+            class="px-4 py-2 rounded-lg text-xs font-bold text-[var(--text-muted)] hover:text-[var(--text)] bg-transparent hover:bg-slate-500/10 cursor-pointer transition active:scale-95"
+          >
+            Hủy bỏ
+          </button>
+          <button 
+            onclick={handleSelect}
+            class="px-5 py-2 rounded-lg text-xs font-bold text-white bg-[var(--accent)] hover:bg-[var(--accent)]/90 cursor-pointer transition active:scale-95 shadow-md shadow-[var(--accent)]/10"
+          >
+            Xác nhận & Tiếp tục
+          </button>
+        </div>
       </div>
     </div>
   </div>
