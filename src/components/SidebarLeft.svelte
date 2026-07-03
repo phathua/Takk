@@ -55,15 +55,19 @@
         if (confirmGo) {
           appState.addLog("Info", "Bắt đầu tải xuống bản cập nhật...");
 
+          let lastLoggedPercent = 0;
           // Đăng ký lắng nghe tiến trình tải
           progressUnsubscribe = await listen("update-progress", (event) => {
             const percent = event.payload;
             appState.statusText = `Đang tải bản cập nhật: ${percent}%`;
-            appState.addLog(
-              "Info",
-              `Đang tải bản cập nhật: ${percent}%`,
-              false,
-            );
+            if (percent === 100 || percent - lastLoggedPercent >= 10) {
+              appState.addLog(
+                "Info",
+                `Đang tải bản cập nhật: ${percent}%`,
+                false,
+              );
+              lastLoggedPercent = percent;
+            }
           });
 
           await invoke("download_and_install", { url: result.download_url });

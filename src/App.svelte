@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { scale, fade } from 'svelte/transition';
+  import { flip } from 'svelte/animate';
   import { Sliders, RefreshCw, Play, FileUp, Plus, X, Eye } from 'lucide-svelte';
   import { listen } from '@tauri-apps/api/event';
   import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -10,6 +11,36 @@
   import ConfirmModal from './components/ConfirmModal.svelte';
 
   let isGlobalDragOver = $state(false);
+  let draggedTabIdx = $state(null);
+
+  function handleDragStart(e, idx) {
+    draggedTabIdx = idx;
+    e.dataTransfer.effectAllowed = 'move';
+  }
+
+  function handleDragOver(e, idx) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  }
+
+  function handleDrop(e, targetIdx) {
+    e.preventDefault();
+    if (draggedTabIdx !== null && draggedTabIdx !== targetIdx) {
+      const projects = [...appState.openProjects];
+      const activeProj = projects[appState.activeProjectIdx];
+      
+      const [item] = projects.splice(draggedTabIdx, 1);
+      projects.splice(targetIdx, 0, item);
+      
+      appState.openProjects = projects;
+      
+      const newActiveIdx = projects.indexOf(activeProj);
+      if (newActiveIdx !== -1) {
+        appState.activeProjectIdx = newActiveIdx;
+      }
+    }
+    draggedTabIdx = null;
+  }
 
   // Import components
   import SidebarLeft from './components/SidebarLeft.svelte';
@@ -313,10 +344,15 @@
 
     <!-- TAB BAR -->
     <div class="h-10 flex items-end bg-[var(--sidebar-bg)] border-b border-[var(--border)] px-4 gap-1 shrink-0 overflow-x-auto select-none">
-      {#each appState.openProjects as proj, idx}
+      {#each appState.openProjects as proj, idx (proj.id)}
         <div 
+          animate:flip={{ duration: 180 }}
           role="button"
           tabindex="0"
+          draggable="true"
+          ondragstart={(e) => handleDragStart(e, idx)}
+          ondragover={(e) => handleDragOver(e, idx)}
+          ondrop={(e) => handleDrop(e, idx)}
           class="group h-8 flex items-center gap-2 px-3 rounded-t-md text-xs font-semibold border-t border-x cursor-pointer transition-all duration-200 select-none max-w-[200px] outline-none {appState.activeProjectIdx === idx ? 'bg-[var(--background)] border-[var(--border)] text-[var(--text)]' : 'bg-transparent border-transparent text-[var(--text-muted)] hover:bg-[var(--card-bg)]/50'}"
           onclick={() => appState.switchProjectTab(idx)}
           onkeydown={(e) => {
@@ -325,7 +361,6 @@
             }
           }}
         >
-          <span class="truncate max-w-[120px]" title={proj.path || proj.name}>{proj.name}</span>
           {#if proj.files.length > 0 && (proj.path === null || proj.lastSavedState !== JSON.stringify(proj.files.map(f => ({
             brand: f.brand,
             provider: f.provider,
@@ -340,6 +375,7 @@
           }))))}
             <span class="w-1.5 h-1.5 rounded-full bg-[var(--accent)] shrink-0" title="Chưa lưu"></span>
           {/if}
+          <span class="truncate max-w-[120px]" title={proj.path || proj.name}>{proj.name}</span>
           <button 
             type="button"
             class="p-0.5 rounded-full hover:bg-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)] transition opacity-0 group-hover:opacity-100 focus:opacity-100"
