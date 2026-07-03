@@ -3,15 +3,22 @@
 @variant dark (&:where(.dark, .dark *));
 
 :root {
-  --background: #f8fafc; /* Light slate bg */
-  --text: #0f172a; /* Dark slate text */
-  --text-muted: #64748b; /* Muted text */
-  --border: #e2e8f0; /* Crisp light border */
-  --card-bg: #ffffff; /* Clean white card */
-  --sidebar-bg: #ffffff; /* Solid white sidebar */
+  --background: #f8fafc;
+  /* Light slate bg */
+  --text: #0f172a;
+  /* Dark slate text */
+  --text-muted: #64748b;
+  /* Muted text */
+  --border: #e2e8f0;
+  /* Crisp light border */
+  --card-bg: #ffffff;
+  /* Clean white card */
+  --sidebar-bg: #ffffff;
+  /* Solid white sidebar */
   --input-bg: #ffffff;
   --input-border: #cbd5e1;
-  --accent: #2563eb; /* Untitled UI premium blue */
+  --accent: #2563eb;
+  /* Untitled UI premium blue */
   --accent-hover: #1d4ed8;
   --accent-glow: rgba(37, 99, 235, 0.08);
   --active-file-bg: #f0f6ff;
@@ -19,15 +26,22 @@
 }
 
 .dark {
-  --background: #09090b; /* Zinc 950 clean black */
-  --text: #f4f4f5; /* Zinc 100 text */
-  --text-muted: #a1a1aa; /* Zinc 400 muted text */
-  --border: #27272a; /* Zinc 800 crisp dark border */
-  --card-bg: #09090b; /* Pure black cards */
-  --sidebar-bg: #09090b; /* Pure black sidebar */
+  --background: #09090b;
+  /* Zinc 950 clean black */
+  --text: #f4f4f5;
+  /* Zinc 100 text */
+  --text-muted: #a1a1aa;
+  /* Zinc 400 muted text */
+  --border: #27272a;
+  /* Zinc 800 crisp dark border */
+  --card-bg: #09090b;
+  /* Pure black cards */
+  --sidebar-bg: #09090b;
+  /* Pure black sidebar */
   --input-bg: #09090b;
   --input-border: #27272a;
-  --accent: #3b82f6; /* Luminous blue accent */
+  --accent: #3b82f6;
+  /* Luminous blue accent */
   --accent-hover: #60a5fa;
   --accent-glow: rgba(59, 130, 246, 0.15);
   --active-file-bg: #172554;
@@ -49,13 +63,16 @@
     width: 6px;
     height: 6px;
   }
+
   ::-webkit-scrollbar-track {
     background: transparent;
   }
+
   ::-webkit-scrollbar-thumb {
     background: var(--border);
     border-radius: 9999px;
   }
+
   ::-webkit-scrollbar-thumb:hover {
     background: var(--accent);
   }
@@ -93,6 +110,7 @@
     position: absolute;
     inset: 0;
     margin: auto;
+    margin-top: -0.25px;
     transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
 
@@ -158,14 +176,14 @@
     color: var(--text);
     border-radius: 6px;
     transition: all 0.2s ease;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
   }
 
   .btn-ghost:hover {
     background: var(--sidebar-bg);
     border-color: var(--input-border);
   }
-  
+
   .btn-ghost:disabled {
     opacity: 0.4;
     pointer-events: none;
