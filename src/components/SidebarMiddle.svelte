@@ -17,6 +17,7 @@
     FileX,
     Undo2,
     Redo2,
+    Link,
   } from "lucide-svelte";
   import { slide } from "svelte/transition";
   import { flip } from "svelte/animate";
@@ -470,6 +471,18 @@
               >
                 <ArrowDown size={11} />
               </button>
+              {#if file.not_found}
+                <button
+                  onclick={(e) => {
+                    e.stopPropagation();
+                    appState.relinkFile(idx);
+                  }}
+                  class="p-1 hover:bg-blue-500/10 hover:text-blue-500 rounded text-amber-500 cursor-pointer animate-none"
+                  title="Thay thế tệp tin bị mất (Liên kết lại)"
+                >
+                  <Link size={11} />
+                </button>
+              {/if}
               <button
                 onclick={(e) => {
                   e.stopPropagation();

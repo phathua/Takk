@@ -67,19 +67,30 @@
 
       <!-- Action Buttons -->
       <div class="px-6 py-4 bg-slate-500/5 border-t border-[var(--border)] flex items-center justify-end gap-3">
-        <button 
-          onclick={handleCancel}
-          class="px-4 py-2 rounded-lg text-xs font-bold text-[var(--text-muted)] hover:text-[var(--text)] bg-transparent hover:bg-slate-500/10 cursor-pointer transition active:scale-95"
-        >
-          {dialog.cancelText}
-        </button>
-        <button 
-          onclick={handleConfirm}
-          class="px-4 py-2 rounded-lg text-xs font-bold text-white cursor-pointer transition active:scale-95
-            {dialog.kind === 'danger' ? 'bg-rose-500 hover:bg-rose-600' : 'bg-[var(--accent)] hover:bg-[var(--accent)]/90'}"
-        >
-          {dialog.confirmText}
-        </button>
+        {#if dialog.buttons && dialog.buttons.length > 0}
+          {#each dialog.buttons as btn}
+            <button 
+              onclick={() => dialog.resolve(btn.value)}
+              class="px-4 py-2 rounded-lg text-xs font-bold cursor-pointer transition active:scale-95 {btn.class || 'text-[var(--text-muted)] hover:text-[var(--text)] bg-transparent hover:bg-slate-500/10'}"
+            >
+              {btn.text}
+            </button>
+          {/each}
+        {:else}
+          <button 
+            onclick={handleCancel}
+            class="px-4 py-2 rounded-lg text-xs font-bold text-[var(--text-muted)] hover:text-[var(--text)] bg-transparent hover:bg-slate-500/10 cursor-pointer transition active:scale-95"
+          >
+            {dialog.cancelText}
+          </button>
+          <button 
+            onclick={handleConfirm}
+            class="px-4 py-2 rounded-lg text-xs font-bold text-white cursor-pointer transition active:scale-95
+              {dialog.kind === 'danger' ? 'bg-rose-500 hover:bg-rose-600' : 'bg-[var(--accent)] hover:bg-[var(--accent)]/90'}"
+          >
+            {dialog.confirmText}
+          </button>
+        {/if}
       </div>
     </div>
   </div>

@@ -32,6 +32,7 @@ class AppState {
     confirmText: "Đồng ý",
     cancelText: "Hủy",
     kind: "info",
+    buttons: null,
     resolve: null
   });
 
@@ -44,6 +45,7 @@ class AppState {
         confirmText: options.confirmText || "Đồng ý",
         cancelText: options.cancelText || "Hủy",
         kind: options.kind || "info",
+        buttons: options.buttons || null,
         resolve: (result) => {
           this.confirmDialog.show = false;
           resolve(result);
@@ -186,6 +188,7 @@ class AppState {
 
   createNewProjectObject(path = null, name = "Dự án mới", files = [], selectedFileIdx = -1, exportFormat = "xlsx") {
     return {
+      id: crypto.randomUUID(),
       path,
       name,
       files,
@@ -271,14 +274,48 @@ class AppState {
 
       if (isDirty) {
         const confirmClose = await this.confirm({
-          title: "Đóng dự án",
-          message: `Dự án "${proj.name}" có thay đổi chưa lưu. Bạn có chắc chắn muốn đóng tab này không?\nMọi thay đổi chưa lưu sẽ bị mất.`,
-          confirmText: "Đóng tab",
-          cancelText: "Hủy",
-          kind: "warning"
+          title: "Lưu thay đổi?",
+          message: `Dự án "${proj.name}" có thay đổi chưa lưu. Bạn có muốn lưu các thay đổi trước khi đóng không?`,
+          kind: "warning",
+          buttons: [
+            { text: "Lưu", value: "save", class: "bg-[var(--accent)] hover:bg-[var(--accent)]/90 text-white" },
+            { text: "Lưu như...", value: "save_as", class: "bg-slate-500/10 hover:bg-slate-500/20 text-[var(--text)] border border-[var(--border)]" },
+            { text: "Hủy bỏ (Không lưu)", value: "discard", class: "bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400" }
+          ]
         });
-        if (!confirmClose) {
+
+        if (confirmClose === false || confirmClose === null) {
+          // Bấm nút X hoặc bấm ngoài (Hủy bỏ hành động đóng tab)
           return;
+        }
+
+        if (confirmClose === "save" || confirmClose === "save_as") {
+          // Chuyển sang tab này để tiến hành lưu
+          if (idx !== this.activeProjectIdx) {
+            this.switchProjectTab(idx);
+          }
+          await this.handleSaveProject(confirmClose === "save_as");
+          
+          // Kiểm tra xem đã lưu thành công chưa (đề phòng người dùng hủy hộp thoại lưu file)
+          const reCheckProj = this.openProjects[idx];
+          if (reCheckProj) {
+            const reCurrentState = JSON.stringify(reCheckProj.files.map(f => ({
+              brand: f.brand,
+              provider: f.provider,
+              created_at: f.created_at,
+              normalize_basic: f.normalize_basic,
+              normalize_special: f.normalize_special,
+              normalize_position: f.normalize_position,
+              normalize_suffix: f.normalize_suffix,
+              generate_cost: f.generate_cost,
+              cost_discount_percent: f.cost_discount_percent,
+              mapping: f.mapping
+            })));
+            const stillDirty = reCurrentState !== reCheckProj.lastSavedState;
+            if (stillDirty) {
+              return; // Người dùng đã hủy hộp thoại lưu
+            }
+          }
         }
       }
     }
@@ -318,8 +355,17 @@ class AppState {
       // Canh bao neu co file bi mat (notFound)
       const missingFiles = files.filter(f => f.not_found);
       if (missingFiles.length > 0) {
-        const fileNames = missingFiles.map(f => f.path.split(/[\\/]/).pop()).join(", ");
-        this.showToast("Warning", `Không tìm thấy ${missingFiles.length} tệp trong dự án: ${fileNames}. Vui lòng kiểm tra lại đường dẫn!`);
+        const fullFileNames = missingFiles.map(f => f.path.split(/[\\/]/).pop()).join(", ");
+        let toastFileNames = missingFiles.slice(0, 2).map(f => f.path.split(/[\\/]/).pop()).join(", ");
+        if (missingFiles.length > 2) {
+          toastFileNames += `, ... và ${missingFiles.length - 2} tệp khác`;
+        }
+        this.addLog(
+          "Warning",
+          `Không tìm thấy ${missingFiles.length} tệp trong dự án: ${fullFileNames}. Vui lòng kiểm tra lại đường dẫn!`,
+          true,
+          `Không tìm thấy ${missingFiles.length} tệp trong dự án: ${toastFileNames}. Vui lòng kiểm tra lại đường dẫn!`
+        );
       }
 
       const fileName = path.split(/[\\/]/).pop();
@@ -351,7 +397,14 @@ class AppState {
       this.addLog("Success", `Đã mở thành công dự án: ${path}`);
       this.addRecentFile(path, 'project');
     } catch (e) {
-      this.addLog("Error", `Lỗi mở dự án từ đường dẫn: ${e}`);
+      const errStr = String(e);
+      let viMsg = "Không thể mở dự án. Vui lòng thử lại!";
+      if (errStr.includes("cannot find the file") || errStr.includes("os error 2") || errStr.includes("No such file or directory")) {
+        viMsg = "Không tìm thấy tệp tin dự án được chỉ định. Vui lòng kiểm tra lại đường dẫn!";
+      } else if (errStr.includes("Permission denied") || errStr.includes("os error 5")) {
+        viMsg = "Không có quyền truy cập hoặc ghi vào tệp tin dự án này.";
+      }
+      this.addLog("Error", `Lỗi mở dự án từ đường dẫn: ${e}`, true, viMsg);
     }
   }
 
@@ -484,10 +537,10 @@ class AppState {
   }
 
   // Logs
-  addLog(level, message, triggerToast = true) {
+  addLog(level, message, triggerToast = true, toastMessage = null) {
     this.logs = [{ time: new Date().toLocaleTimeString(), level, message }, ...this.logs];
     if (triggerToast) {
-      return this.showToast(level, message);
+      return this.showToast(level, toastMessage || message);
     }
     return null;
   }
@@ -648,6 +701,49 @@ class AppState {
     }
   }
 
+  async relinkFile(idx) {
+    const file = this.files[idx];
+    if (!file) return;
+
+    try {
+      const selected = await open({
+        multiple: false,
+        filters: [{
+          name: 'Excel/CSV',
+          extensions: ['xlsx', 'xls', 'csv']
+        }]
+      });
+
+      if (!selected) return;
+
+      const newHash = await invoke('calculate_file_hash', { path: selected });
+
+      if (file.file_hash && file.file_hash !== newHash) {
+        const oldName = file.path.split(/[\\/]/).pop();
+        const newName = selected.split(/[\\/]/).pop();
+        const confirmReplace = await this.confirm({
+          title: "Xác nhận thay thế tệp",
+          message: `Tệp tin mới chọn có nội dung (mã băm) khác biệt so với tệp gốc của dự án:\n` +
+                   `- Tệp gốc: ${oldName}\n` +
+                   `- Tệp mới: ${newName}\n\n` +
+                   `Bạn có chắc chắn muốn liên kết lại bằng tệp mới này không? Điều này có thể làm thay đổi kết quả gộp dữ liệu.`,
+          confirmText: "Đồng ý thay thế",
+          cancelText: "Hủy bỏ",
+          kind: "warning"
+        });
+        if (!confirmReplace) return;
+      }
+
+      this.saveHistoryState();
+      file.path = selected;
+      file.not_found = false;
+      file.file_hash = newHash;
+      this.addLog("Success", `Đã liên kết lại tệp thành công: ${selected}`);
+    } catch (e) {
+      this.addLog("Error", `Lỗi liên kết lại tệp: ${e}`);
+    }
+  }
+
   removeInvalidFiles(invalidIds) {
     if (!invalidIds || invalidIds.length === 0) return;
     this.saveHistoryState();
@@ -716,7 +812,14 @@ class AppState {
         this.addRecentFile(path, 'project');
       }
     } catch (e) {
-      this.addLog("Error", `Lỗi lưu dự án: ${e}`);
+      const errStr = String(e);
+      let viMsg = "Không thể lưu dự án. Vui lòng thử lại!";
+      if (errStr.includes("cannot find the file") || errStr.includes("os error 2") || errStr.includes("No such file or directory")) {
+        viMsg = "Không tìm thấy thư mục lưu trữ hoặc tệp tin.";
+      } else if (errStr.includes("Permission denied") || errStr.includes("os error 5")) {
+        viMsg = "Không có quyền ghi tệp tin vào thư mục đã chọn.";
+      }
+      this.addLog("Error", `Lỗi lưu dự án: ${e}`, true, viMsg);
     }
   }
 
