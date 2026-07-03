@@ -19,6 +19,8 @@ pub struct FileConfig {
     pub generate_cost: bool,              // Tao gia von tu % chiet khau
     pub cost_discount_percent: f64,       // % chiet khau (vd: 30 -> cost = retail * 0.7)
     pub created_at: String,               // Ngay tao bang gia
+    #[serde(default)]
+    pub not_found: bool,                  // Danh dau neu khong tim thay file (chi dung cho bgx)
 }
 
 // Cấu hình file dự án khi lưu trữ raw binary

@@ -49,8 +49,9 @@ fn save_project(
     app_mode: Option<String>,
 ) -> Result<(), String> {
     applog!("INFO", "Dang luu du an vao: {}", path);
-    let project = project::pack_project_files(files, export_format, app_mode).map_err(|e| e.to_string())?;
-    project::save_project_to_file(&project, &PathBuf::from(&path)).map_err(|e| e.to_string())?;
+    let path_buf = PathBuf::from(&path);
+    let project = project::pack_project_files(files, export_format, app_mode, &path_buf).map_err(|e| e.to_string())?;
+    project::save_project_to_file(&project, &path_buf).map_err(|e| e.to_string())?;
     applog!("SUCCESS", "Luu du an thanh cong!");
     Ok(())
 }
@@ -59,8 +60,9 @@ fn save_project(
 #[tauri::command]
 fn load_project(path: String) -> Result<LoadProjectResponse, String> {
     applog!("INFO", "Dang doc du an tu: {}", path);
-    let project = project::load_project_from_file(&PathBuf::from(&path)).map_err(|e| e.to_string())?;
-    let mut files = project::unpack_project_files(&project).map_err(|e| e.to_string())?;
+    let path_buf = PathBuf::from(&path);
+    let project = project::load_project_from_file(&path_buf).map_err(|e| e.to_string())?;
+    let mut files = project::unpack_project_files(&project, &path_buf).map_err(|e| e.to_string())?;
     for file in &mut files {
         for (col_idx, h) in file.headers.iter_mut().enumerate() {
             if h.trim().is_empty() {

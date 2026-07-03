@@ -371,13 +371,17 @@
                 ? 'border-[var(--accent)] bg-[var(--accent-glow)]/30 scale-[1.02] shadow-lg shadow-[var(--accent)]/5'
                 : ''}
               {draggedIdx !== idx
-                ? isFileInvalid(file)
+                ? file.not_found
                   ? appState.selectedFileIdx === idx
-                    ? 'bg-rose-500/10 border-rose-500 shadow-md shadow-rose-500/5'
-                    : 'bg-rose-500/5 border-rose-500/35 hover:bg-rose-500/10 hover:border-rose-500/55 shadow-sm shadow-rose-500/5'
-                  : appState.selectedFileIdx === idx
-                    ? 'bg-[var(--active-file-bg)] border-[var(--accent)]/55 shadow-md shadow-[var(--accent)]/5'
-                    : 'bg-[var(--card-bg)] border-[var(--border)] hover:bg-[var(--active-file-bg)]/30 hover:border-zinc-500/30'
+                    ? 'bg-amber-500/10 border-amber-500 shadow-md shadow-amber-500/5'
+                    : 'bg-amber-500/5 border-amber-500/35 hover:bg-amber-500/10 hover:border-amber-500/55 shadow-sm shadow-amber-500/5'
+                  : isFileInvalid(file)
+                    ? appState.selectedFileIdx === idx
+                      ? 'bg-rose-500/10 border-rose-500 shadow-md shadow-rose-500/5'
+                      : 'bg-rose-500/5 border-rose-500/35 hover:bg-rose-500/10 hover:border-rose-500/55 shadow-sm shadow-rose-500/5'
+                    : appState.selectedFileIdx === idx
+                      ? 'bg-[var(--active-file-bg)] border-[var(--accent)]/55 shadow-md shadow-[var(--accent)]/5'
+                      : 'bg-[var(--card-bg)] border-[var(--border)] hover:bg-[var(--active-file-bg)]/30 hover:border-zinc-500/30'
                 : ''}"
           >
             <!-- Vach chi thi vi tri tha (Drop indicator line) -->
@@ -420,7 +424,9 @@
                 class="text-xs font-bold truncate text-[var(--text)] flex items-center gap-1.5"
                 title={file.path}
               >
-                {#if isFileInvalid(file)}
+                {#if file.not_found}
+                  <AlertTriangle size={12} class="text-amber-500 shrink-0" />
+                {:else if isFileInvalid(file)}
                   <AlertTriangle size={12} class="text-rose-500 shrink-0" />
                 {/if}
                 <span class="truncate">{getDisplayName(file.path)}</span>

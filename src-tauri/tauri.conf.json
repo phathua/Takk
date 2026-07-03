@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Takk",
-  "version": "0.2.2",
+  "version": "0.2.4",
   "identifier": "com.vixlabs.taxx",
   "build": {
     "beforeDevCommand": "pnpm dev",
@@ -46,11 +46,18 @@
     "fileAssociations": [
       {
         "ext": [
-          "bgx",
+          "bgx"
+        ],
+        "name": "Dự án Takk Tham chiếu",
+        "description": "Tệp dự án Takk tham chiếu (chỉ lưu đường dẫn)",
+        "role": "Editor"
+      },
+      {
+        "ext": [
           "bg"
         ],
-        "name": "Tập tin Dự án Takk",
-        "description": "Tệp cơ sở dữ liệu dự án Takk",
+        "name": "Dự án Takk Đóng gói",
+        "description": "Tệp dự án Takk đóng gói (chứa dữ liệu thô)",
         "role": "Editor"
       }
     ]

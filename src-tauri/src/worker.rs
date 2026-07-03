@@ -19,31 +19,36 @@ pub fn find_header_row(rows: &[Vec<String>]) -> usize {
         let non_empty_count = non_empty_cells.len();
         if non_empty_count < 2 { continue; } 
 
-        for s in &non_empty_cells {
-            if s == "stt" || s == "no" || s == "no." || s == "so tt" || s == "thu tu" { 
+        let cleaned_cells: Vec<String> = row.iter()
+            .map(|s| clean_vietnamese(s))
+            .filter(|s| !s.is_empty())
+            .collect();
+
+        for s in &cleaned_cells {
+            if s == "stt" || s == "no" || s == "no." || s == "sott" || s == "thutu" { 
                 score += 3.0; 
             }
-            if s.contains("ma") || s.contains("code") || s.contains("part number") || s.contains("sku") { 
+            if s.contains("ma") || s.contains("code") || s.contains("partnumber") || s.contains("sku") { 
                 score += 2.5; 
             }
-            if s.contains("ten") || s.contains("name") || s.contains("dien giai") || s.contains("description") || s.contains("hang hoa") { 
+            if s.contains("ten") || s.contains("name") || s.contains("diengiai") || s.contains("description") || s.contains("hanghoa") { 
                 score += 2.5; 
             }
-            if s.contains("gia") || s.contains("price") || s.contains("don gia") || s.contains("thanh tien") || s.contains("vnd") { 
+            if s.contains("gia") || s.contains("price") || s.contains("dongia") || s.contains("thanhtien") || s.contains("vnd") { 
                 score += 2.0; 
             }
             if s.contains("xe") || s.contains("model") || s.contains("loai") || s.contains("hieu") || s.contains("doi") { 
                 score += 1.2; 
             }
-            if s.contains("ghi chu") || s.contains("note") || s.contains("mau") || s.contains("color") { 
+            if s.contains("ghichu") || s.contains("note") || s.contains("mau") || s.contains("color") { 
                 score += 1.0; 
             }
         }
 
         let mut keyword_groups = 0;
-        if non_empty_cells.iter().any(|s| s.contains("ma") || s.contains("code")) { keyword_groups += 1; }
-        if non_empty_cells.iter().any(|s| s.contains("ten") || s.contains("name")) { keyword_groups += 1; }
-        if non_empty_cells.iter().any(|s| s.contains("gia") || s.contains("price")) { keyword_groups += 1; }
+        if cleaned_cells.iter().any(|s| s.contains("ma") || s.contains("code")) { keyword_groups += 1; }
+        if cleaned_cells.iter().any(|s| s.contains("ten") || s.contains("name")) { keyword_groups += 1; }
+        if cleaned_cells.iter().any(|s| s.contains("gia") || s.contains("price")) { keyword_groups += 1; }
         
         if keyword_groups >= 2 {
             score += 5.0;
@@ -333,6 +338,7 @@ pub fn run_add_files_worker(
                 generate_cost: false,
                 cost_discount_percent: 0.0,
                 created_at,
+                not_found: false,
             };
 
             let _ = app.emit("progress-update", ProcessingUpdate::Log {

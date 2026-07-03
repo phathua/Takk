@@ -1,33 +1,47 @@
 use crate::types::{FileConfig, ProjectFile, ProjectFileConfig};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use flate2::read::GzDecoder;
 use std::io::Read;
 
-// Luu du an: .bg luu bang bincode+gzip (format cu), .bgx hoac format khac luu bang postcard+zstd (format moi)
-pub fn save_project_to_file(project: &ProjectFile, path: &Path) -> anyhow::Result<()> {
-    let extension = path.extension()
-        .and_then(|ext| ext.to_str())
-        .map(|ext| ext.to_lowercase());
+// Tinh toan duong dan tuong doi tu target toi base
+fn get_relative_path(target: &Path, base: &Path) -> Option<PathBuf> {
+    let target = target.canonicalize().unwrap_or_else(|_| target.to_path_buf());
+    let base = base.canonicalize().unwrap_or_else(|_| base.to_path_buf());
 
-    if extension.as_deref() == Some("bg") {
-        // Luu dang cu: bincode + gzip (flate2)
-        use flate2::write::GzEncoder;
-        use flate2::Compression;
-        use std::io::Write;
+    let mut target_comps = target.components().peekable();
+    let mut base_comps = base.components().peekable();
 
-        let serialized = bincode::serialize(project)?;
-        let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
-        encoder.write_all(&serialized)?;
-        let compressed = encoder.finish()?;
-        std::fs::write(path, compressed)?;
-    } else {
-        // Luu dang moi: postcard + zstd
-        let serialized = postcard::to_stdvec(project)?;
-        // Level 3: can bang giua toc do nen va ty le nen tot
-        let compressed = zstd::encode_all(serialized.as_slice(), 3)?;
-        std::fs::write(path, compressed)?;
+    if target_comps.peek() != base_comps.peek() {
+        return None;
     }
+
+    while let (Some(t), Some(b)) = (target_comps.peek(), base_comps.peek()) {
+        if t == b {
+            target_comps.next();
+            base_comps.next();
+        } else {
+            break;
+        }
+    }
+
+    let mut result = PathBuf::new();
+    for _ in base_comps {
+        result.push("..");
+    }
+    for comp in target_comps {
+        result.push(comp.as_os_str());
+    }
+    Some(result)
+}
+
+// Luu du an: tat ca luu bang postcard+zstd (format moi), tuong thich khi mo ca file .bg cu
+pub fn save_project_to_file(project: &ProjectFile, path: &Path) -> anyhow::Result<()> {
+    // Luu dang moi: postcard + zstd
+    let serialized = postcard::to_stdvec(project)?;
+    // Level 3: can bang giua toc do nen va ty le nen tot
+    let compressed = zstd::encode_all(serialized.as_slice(), 3)?;
+    std::fs::write(path, compressed)?;
     Ok(())
 }
 
@@ -59,26 +73,46 @@ pub fn pack_project_files(
     files: Vec<FileConfig>,
     export_format: Option<String>,
     app_mode: Option<String>,
+    project_path: &Path,
 ) -> anyhow::Result<ProjectFile> {
     let mut project_configs = Vec::new();
+    let is_bgx = project_path.extension()
+        .and_then(|ext| ext.to_str())
+        .map(|ext| ext.to_lowercase() == "bgx")
+        .unwrap_or(false);
 
-    for config in files {
-        if config.path.exists() {
-            let raw_data = std::fs::read(&config.path)?;
-            let file_name = config.path.file_name()
-                .map(|s| s.to_string_lossy().to_string())
-                .unwrap_or_else(|| "unknown".to_string());
-            let extension = config.path.extension()
-                .map(|s| s.to_string_lossy().to_string())
-                .unwrap_or_default();
+    let project_dir = project_path.parent();
 
-            project_configs.push(ProjectFileConfig {
-                config,
-                file_name,
-                extension,
-                raw_data,
-            });
-        }
+    for mut config in files {
+        let file_name = config.path.file_name()
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or_else(|| "unknown".to_string());
+        let extension = config.path.extension()
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or_default();
+
+        let raw_data = if is_bgx {
+            // Neu la bgx, doi sang duong dan tuong doi neu cung o dia
+            if let Some(proj_dir) = project_dir {
+                if let Some(rel_path) = get_relative_path(&config.path, proj_dir) {
+                    config.path = rel_path;
+                }
+            }
+            Vec::new()
+        } else {
+            if config.path.exists() {
+                std::fs::read(&config.path)?
+            } else {
+                Vec::new()
+            }
+        };
+
+        project_configs.push(ProjectFileConfig {
+            config,
+            file_name,
+            extension,
+            raw_data,
+        });
     }
 
     Ok(ProjectFile {
@@ -105,21 +139,69 @@ fn strip_index_prefix(file_name: &str) -> &str {
     current
 }
 
-// Giai nen cac file raw vao thu muc tam va cap nhat duong dan moi
-pub fn unpack_project_files(project: &ProjectFile) -> anyhow::Result<Vec<FileConfig>> {
+// Giai nen cac file hoac giai quyet duong dan tham chieu
+pub fn unpack_project_files(project: &ProjectFile, project_path: &Path) -> anyhow::Result<Vec<FileConfig>> {
     let temp_dir = std::env::temp_dir().join("Takk_Projects");
     std::fs::create_dir_all(&temp_dir)?;
 
+    let project_dir = project_path.parent();
     let mut new_files = Vec::new();
 
     for (i, p_config) in project.files.iter().enumerate() {
-        let clean_name = strip_index_prefix(&p_config.file_name);
-        let unique_name = format!("{}_{}", i, clean_name);
-        let temp_file_path = temp_dir.join(unique_name);
-        std::fs::write(&temp_file_path, &p_config.raw_data)?;
-
         let mut config = p_config.config.clone();
-        config.path = temp_file_path;
+        let mut not_found = false;
+
+        if p_config.raw_data.is_empty() {
+            // Day la file tham chieu cua .bgx
+            let stored_path = &p_config.config.path;
+            let mut resolved_path = stored_path.clone();
+
+            if stored_path.is_relative() {
+                if let Some(proj_dir) = project_dir {
+                    let abs_path = proj_dir.join(stored_path);
+                    if abs_path.exists() {
+                        resolved_path = abs_path;
+                    } else {
+                        not_found = true;
+                        resolved_path = abs_path;
+                    }
+                } else {
+                    not_found = true;
+                }
+            } else {
+                // Duong dan tuyet doi
+                if !stored_path.exists() {
+                    // Thu tim trong cung thu muc chua project
+                    if let Some(proj_dir) = project_dir {
+                        if let Some(file_name) = stored_path.file_name() {
+                            let fallback_path = proj_dir.join(file_name);
+                            if fallback_path.exists() {
+                                resolved_path = fallback_path;
+                            } else {
+                                not_found = true;
+                            }
+                        } else {
+                            not_found = true;
+                        }
+                    } else {
+                        not_found = true;
+                    }
+                }
+            }
+
+            config.path = resolved_path;
+            config.not_found = not_found;
+        } else {
+            // Day la file dong goi cua .bg
+            let clean_name = strip_index_prefix(&p_config.file_name);
+            let unique_name = format!("{}_{}", i, clean_name);
+            let temp_file_path = temp_dir.join(unique_name);
+            std::fs::write(&temp_file_path, &p_config.raw_data)?;
+
+            config.path = temp_file_path;
+            config.not_found = false;
+        }
+
         new_files.push(config);
     }
 

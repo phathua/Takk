@@ -314,6 +314,14 @@ class AppState {
     try {
       const res = await invoke('load_project', { path });
       const files = res.files.map(f => ({ ...f, id: f.id || crypto.randomUUID() }));
+      
+      // Canh bao neu co file bi mat (notFound)
+      const missingFiles = files.filter(f => f.not_found);
+      if (missingFiles.length > 0) {
+        const fileNames = missingFiles.map(f => f.path.split(/[\\/]/).pop()).join(", ");
+        this.showToast("Warning", `Không tìm thấy ${missingFiles.length} tệp trong dự án: ${fileNames}. Vui lòng kiểm tra lại đường dẫn!`);
+      }
+
       const fileName = path.split(/[\\/]/).pop();
 
       if (!this.currentProjectPath && this.files.length === 0) {
@@ -675,10 +683,16 @@ class AppState {
 
         path = await save({
           defaultPath: defaultName,
-          filters: [{
-            name: 'Dự án Takk (.bgx, .bg)',
-            extensions: ['bgx', 'bg']
-          }]
+          filters: [
+            {
+              name: 'Dự án Takk tham chiếu (.bgx)',
+              extensions: ['bgx']
+            },
+            {
+              name: 'Dự án Takk đóng gói (.bg)',
+              extensions: ['bg']
+            }
+          ]
         });
       }
 
@@ -710,10 +724,20 @@ class AppState {
     try {
       const path = await open({
         multiple: false,
-        filters: [{
-          name: 'Dự án Takk (.bgx, .bg)',
-          extensions: ['bgx', 'bg']
-        }]
+        filters: [
+          {
+            name: 'Mọi dự án Takk (.bgx, .bg)',
+            extensions: ['bgx', 'bg']
+          },
+          {
+            name: 'Dự án Takk tham chiếu (.bgx)',
+            extensions: ['bgx']
+          },
+          {
+            name: 'Dự án Takk đóng gói (.bg)',
+            extensions: ['bg']
+          }
+        ]
       });
 
       if (path) {
