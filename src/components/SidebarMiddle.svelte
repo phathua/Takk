@@ -60,37 +60,15 @@
     }
   }
 
-  // --- Logic nhan giu (long press) de dat lai thiet lap luu ---
-  let longPressTimeout = null;
-  let isLongPressTriggered = false;
-
-  function handleButtonPointerDown(event) {
-    isLongPressTriggered = false;
-    longPressTimeout = setTimeout(() => {
-      isLongPressTriggered = true;
-      localStorage.removeItem('takk_skip_save_format_explanation');
-      localStorage.removeItem('takk_preferred_save_format');
-      appState.addLog("Info", "Đã đặt lại thiết lập lưu dự án. Modal chọn định dạng sẽ hiển thị lại ở lần lưu tiếp theo.", false);
-      appState.showToast("Success", "Đã đặt lại thiết lập lưu dự án");
-    }, 800);
+  // --- Logic click chuot phai (right click) de dat lai thiet lap luu ---
+  function handleRightClick(event) {
+    event.preventDefault();
+    localStorage.removeItem('takk_skip_save_format_explanation');
+    localStorage.removeItem('takk_preferred_save_format');
+    appState.addLog("Info", "Đã đặt lại thiết lập lưu dự án. Modal chọn định dạng sẽ hiển thị lại ở lần lưu tiếp theo.", false);
+    appState.showToast("Success", "Đã đặt lại thiết lập lưu dự án");
   }
 
-  function handleButtonPointerUp(event, saveAs = false) {
-    if (longPressTimeout) {
-      clearTimeout(longPressTimeout);
-      longPressTimeout = null;
-    }
-    if (!isLongPressTriggered) {
-      appState.handleSaveProject(saveAs);
-    }
-  }
-
-  function handleButtonPointerLeave() {
-    if (longPressTimeout) {
-      clearTimeout(longPressTimeout);
-      longPressTimeout = null;
-    }
-  }
 
 
   // --- Trang thai keo tha bang pointer events ---
@@ -288,21 +266,19 @@
       {#if appState.files.length > 0 || appState.currentProjectPath}
         <!-- Luu du an -->
         <button
-          onpointerdown={handleButtonPointerDown}
-          onpointerup={(e) => handleButtonPointerUp(e, false)}
-          onpointerleave={handleButtonPointerLeave}
+          onclick={() => appState.handleSaveProject(false)}
+          oncontextmenu={handleRightClick}
           class="p-1.5 hover:bg-[var(--active-file-bg)] rounded-md text-[var(--text-muted)] hover:text-[var(--text)] cursor-pointer transition flex items-center justify-center"
-          title="Lưu dự án hiện tại (Nhấn giữ để đặt lại cấu hình định dạng lưu)"
+          title="Lưu dự án hiện tại (Click chuột phải để đặt lại cấu hình định dạng lưu)"
         >
           <Save size={13} />
         </button>
         <!-- Luu thanh (Save As) -->
         <button
-          onpointerdown={handleButtonPointerDown}
-          onpointerup={(e) => handleButtonPointerUp(e, true)}
-          onpointerleave={handleButtonPointerLeave}
+          onclick={() => appState.handleSaveProject(true)}
+          oncontextmenu={handleRightClick}
           class="p-1.5 hover:bg-[var(--active-file-bg)] rounded-md text-[var(--text-muted)] hover:text-[var(--text)] cursor-pointer transition flex items-center justify-center"
-          title="Lưu thành dự án mới... (Nhấn giữ để đặt lại cấu hình định dạng lưu)"
+          title="Lưu thành dự án mới... (Click chuột phải để đặt lại cấu hình định dạng lưu)"
         >
           <SaveAll size={13} />
         </button>
