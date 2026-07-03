@@ -10,7 +10,6 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use tauri::AppHandle;
 use calamine::{Reader, open_workbook_auto};
-use std::io::BufReader;
 
 pub static APP_HANDLE: std::sync::OnceLock<tauri::AppHandle> = std::sync::OnceLock::new();
 
@@ -355,15 +354,13 @@ async fn get_preview_rows(
         let ext = file.path.extension().and_then(|s| s.to_str()).unwrap_or_default().to_lowercase();
 
         if ext == "csv" {
-            // Phat hien delimiter tu 4KB dau file, khong load toan bo
+            // Đọc file với bộ giải mã thông minh (tự nhận diện BOM/UTF-16/Windows-1258)
+            let content = worker::read_file_to_string_robust(&file.path).map_err(|e| format!("Lỗi đọc file CSV: {}", e))?;
             let delimiter = detect_csv_delimiter(&file.path);
-            // Stream truc tiep tu file, khong load vao String
-            let f = std::fs::File::open(&file.path).map_err(|e| format!("Loi mo file CSV: {}", e))?;
-            let reader = BufReader::new(f);
             let mut rdr = csv::ReaderBuilder::new()
                 .has_headers(false)
                 .delimiter(delimiter)
-                .from_reader(reader);
+                .from_reader(content.as_bytes());
 
             // Chi doc 20 dong dau cho preview de lay header va vai dong du lieu nhanh hon
             let mut raw_rows: Vec<Vec<String>> = Vec::with_capacity(20);
@@ -441,15 +438,13 @@ fn process_and_export(
 
         // 1. Doc du lieu tu Excel hoac CSV
         if ext == "csv" {
-            // Phat hien delimiter tu 4KB dau file, khong load toan bo
+            // Đọc file với bộ giải mã thông minh (tự nhận diện BOM/UTF-16/Windows-1258)
+            let content = worker::read_file_to_string_robust(&file.path).map_err(|e| format!("Lỗi đọc file CSV: {}", e))?;
             let delimiter = detect_csv_delimiter(&file.path);
-            // Stream truc tiep tu file, khong can load toan bo vao String
-            let f = std::fs::File::open(&file.path).map_err(|e| format!("Loi mo file CSV: {}", e))?;
-            let reader = BufReader::new(f);
             let mut rdr = csv::ReaderBuilder::new()
                 .has_headers(false)
                 .delimiter(delimiter)
-                .from_reader(reader);
+                .from_reader(content.as_bytes());
 
             let mut raw_rows: Vec<Vec<String>> = Vec::new();
             for result in rdr.records() {
