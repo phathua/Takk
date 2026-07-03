@@ -141,6 +141,7 @@ impl From<FileConfigV0> for FileConfig {
             created_at: v0.created_at,
             not_found: false,
             file_hash: None,
+            original_path: None,
         }
     }
 }
@@ -152,6 +153,7 @@ impl From<ProjectFileConfigV0> for ProjectFileConfig {
             file_name: v0.file_name,
             extension: v0.extension,
             raw_data: v0.raw_data,
+            original_path: None,
         }
     }
 }
@@ -187,6 +189,7 @@ impl From<FileConfigV1> for FileConfig {
             created_at: v1.created_at,
             not_found: v1.not_found,
             file_hash: None,
+            original_path: None,
         }
     }
 }
@@ -198,6 +201,7 @@ impl From<ProjectFileConfigV1> for ProjectFileConfig {
             file_name: v1.file_name,
             extension: v1.extension,
             raw_data: v1.raw_data,
+            original_path: None,
         }
     }
 }
@@ -285,8 +289,22 @@ pub fn pack_project_files(
         });
         config.file_hash = file_hash;
 
+        let original_file_path = config.path.clone();
+
         let raw_data = if is_bgx {
             // Neu la bgx, doi sang duong dan tuong doi neu cung o dia
+            // Uu tien dung config.original_path neu no ton tai va hop le
+            let path_to_save = if let Some(ref orig) = config.original_path {
+                if orig.exists() {
+                    orig.clone()
+                } else {
+                    config.path.clone()
+                }
+            } else {
+                config.path.clone()
+            };
+            config.path = path_to_save;
+
             if let Some(proj_dir) = project_dir {
                 if let Some(rel_path) = get_relative_path(&config.path, proj_dir) {
                     config.path = rel_path;
@@ -297,11 +315,21 @@ pub fn pack_project_files(
             file_bytes.unwrap_or_default()
         };
 
+        let is_temp = original_file_path.to_string_lossy().contains("Takk_Projects");
+        let saved_original_path = if is_temp {
+            config.original_path.clone()
+        } else {
+            Some(original_file_path.clone())
+        };
+
+        config.original_path = saved_original_path.clone();
+
         project_configs.push(ProjectFileConfig {
             config,
             file_name,
             extension,
             raw_data,
+            original_path: saved_original_path,
         });
     }
 
@@ -340,6 +368,11 @@ pub fn unpack_project_files(project: &ProjectFile, project_path: &Path) -> anyho
     for (i, p_config) in project.files.iter().enumerate() {
         let mut config = p_config.config.clone();
         let mut not_found = false;
+
+        // Khoi phuc original_path
+        if config.original_path.is_none() {
+            config.original_path = p_config.original_path.clone();
+        }
 
         if p_config.raw_data.is_empty() {
             // Day la file tham chieu cua .bgx

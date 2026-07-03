@@ -23,6 +23,8 @@ pub struct FileConfig {
     pub not_found: bool,                  // Danh dau neu khong tim thay file (chi dung cho bgx)
     #[serde(default)]
     pub file_hash: Option<String>,
+    #[serde(default)]
+    pub original_path: Option<PathBuf>,
 }
 
 // Cấu hình file dự án khi lưu trữ raw binary
@@ -32,6 +34,8 @@ pub struct ProjectFileConfig {
     pub file_name: String,
     pub extension: String,
     pub raw_data: Vec<u8>, // Du lieu nhi phan cua file goc (.xlsx, .csv, .xls)
+    #[serde(default)]
+    pub original_path: Option<PathBuf>,
 }
 
 // Dinh dang luu tru chinh cua du an .bg

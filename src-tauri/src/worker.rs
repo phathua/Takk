@@ -343,6 +343,7 @@ pub fn run_add_files_worker(
                     let bytes = std::fs::read(&file_path).ok();
                     bytes.map(|b| blake3::hash(&b).to_hex().to_string())
                 },
+                original_path: Some(file_path.clone()),
             };
 
             let _ = app.emit("progress-update", ProcessingUpdate::Log {
