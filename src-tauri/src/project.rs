@@ -45,14 +45,103 @@ pub fn save_project_to_file(project: &ProjectFile, path: &Path) -> anyhow::Resul
     Ok(())
 }
 
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct FileConfigV0 {
+    pub path: PathBuf,
+    pub sheet_name: Option<String>,
+    pub brand: String,
+    pub provider: String,
+    pub headers: Vec<String>,
+    pub mapping: HashMap<String, String>,
+    pub normalize_basic: bool,
+    pub normalize_special: bool,
+    pub normalize_position: crate::types::SuffixPosition,
+    pub normalize_suffix: String,
+    pub generate_cost: bool,
+    pub cost_discount_percent: f64,
+    pub created_at: String,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct ProjectFileConfigV0 {
+    pub config: FileConfigV0,
+    pub file_name: String,
+    pub extension: String,
+    pub raw_data: Vec<u8>,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct ProjectFileV0 {
+    pub version: u32,
+    pub app_version: String,
+    pub created_at: String,
+    pub files: Vec<ProjectFileConfigV0>,
+    #[serde(default)]
+    pub export_format: Option<String>,
+    #[serde(default)]
+    pub app_mode: Option<String>,
+}
+
+impl From<FileConfigV0> for FileConfig {
+    fn from(v0: FileConfigV0) -> Self {
+        FileConfig {
+            path: v0.path,
+            sheet_name: v0.sheet_name,
+            brand: v0.brand,
+            provider: v0.provider,
+            headers: v0.headers,
+            mapping: v0.mapping,
+            normalize_basic: v0.normalize_basic,
+            normalize_special: v0.normalize_special,
+            normalize_position: v0.normalize_position,
+            normalize_suffix: v0.normalize_suffix,
+            generate_cost: v0.generate_cost,
+            cost_discount_percent: v0.cost_discount_percent,
+            created_at: v0.created_at,
+            not_found: false,
+            file_hash: None,
+        }
+    }
+}
+
+impl From<ProjectFileConfigV0> for ProjectFileConfig {
+    fn from(v0: ProjectFileConfigV0) -> Self {
+        ProjectFileConfig {
+            config: FileConfig::from(v0.config),
+            file_name: v0.file_name,
+            extension: v0.extension,
+            raw_data: v0.raw_data,
+        }
+    }
+}
+
+impl From<ProjectFileV0> for ProjectFile {
+    fn from(v0: ProjectFileV0) -> Self {
+        ProjectFile {
+            version: v0.version,
+            app_version: v0.app_version,
+            created_at: v0.created_at,
+            files: v0.files.into_iter().map(ProjectFileConfig::from).collect(),
+            export_format: v0.export_format,
+            app_mode: v0.app_mode,
+        }
+    }
+}
+
 // Tai du an tu file .bg (hoac .bgx) co tu dong nhan dien va fallback sang format cu
 pub fn load_project_from_file(path: &Path) -> anyhow::Result<ProjectFile> {
     let raw_data = std::fs::read(path)?;
 
     // 1. Thu dung Zstd + Postcard (Format moi)
     if let Ok(decompressed) = zstd::decode_all(raw_data.as_slice()) {
-        if let Ok(project) = postcard::from_bytes(&decompressed) {
+        if let Ok(project) = postcard::from_bytes::<ProjectFile>(&decompressed) {
             return Ok(project);
+        }
+        if let Ok(project_v0) = postcard::from_bytes::<ProjectFileV0>(&decompressed) {
+            return Ok(ProjectFile::from(project_v0));
         }
     }
 
@@ -60,8 +149,11 @@ pub fn load_project_from_file(path: &Path) -> anyhow::Result<ProjectFile> {
     let mut decoder = GzDecoder::new(raw_data.as_slice());
     let mut decompressed = Vec::new();
     if decoder.read_to_end(&mut decompressed).is_ok() {
-        if let Ok(project) = bincode::deserialize(&decompressed) {
+        if let Ok(project) = bincode::deserialize::<ProjectFile>(&decompressed) {
             return Ok(project);
+        }
+        if let Ok(project_v0) = bincode::deserialize::<ProjectFileV0>(&decompressed) {
+            return Ok(ProjectFile::from(project_v0));
         }
     }
 
