@@ -101,7 +101,10 @@ class AppState {
         saveAs,
         bgSize,
         bgxSize,
-        resolve
+        resolve: (format) => {
+          this.saveProjectDialog.show = false;
+          resolve(format);
+        }
       };
     });
   }
