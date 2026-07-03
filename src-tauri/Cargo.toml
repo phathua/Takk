@@ -1,6 +1,6 @@
 [package]
 name = "takk"
-version = "0.3.7"
+version = "0.4.3"
 description = "Takk - Price List Processor"
 authors = ["you"]
 edition = "2021"
