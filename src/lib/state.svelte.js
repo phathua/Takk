@@ -939,13 +939,15 @@ class AppState {
     }
   }
 
-  async handleProcessAndExport() {
-    if (this.files.length === 0) {
+  async handleProcessAndExport(filesToProcess = null) {
+    const targetFiles = filesToProcess || this.files;
+    if (targetFiles.length === 0) {
       this.addLog("Warning", "Vui lòng thêm ít nhất một file cấu hình.");
       return;
     }
 
-    for (const f of this.files) {
+    for (const f of targetFiles) {
+      if (f.not_found) continue;
       if (!f.brand.trim() || !f.provider.trim()) {
         this.addLog("Warning", `Tệp ${f.path.split(/[\\/]/).pop()} thiếu thông tin Hãng hoặc Nhà cung cấp.`);
         return;
@@ -991,7 +993,7 @@ class AppState {
     this.isProcessing = true;
     try {
       const result = await invoke('process_and_export', {
-        files: this.files,
+        files: targetFiles,
         exportFormat: this.exportFormat,
         outputPath: targetPath
       });

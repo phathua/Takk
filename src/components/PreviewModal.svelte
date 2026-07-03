@@ -1,6 +1,7 @@
 <script>
   import { fade, scale } from 'svelte/transition';
   import { Eye, X, RefreshCw, Play } from 'lucide-svelte';
+  import { appState } from '../lib/state.svelte.js';
 
   // Nhận props từ bên ngoài
   let { 
@@ -9,10 +10,37 @@
     isGeneratingPreview = false,
     previewError = null,
     formatCurrency,
-    onProceed
+    onProceed,
+    allFilesNotFound = false,
+    hasNotFoundFiles = false,
+    hasInvalidConfigFiles = false
   } = $props();
 
-  const handleProceed = () => {
+  const handleProceed = async () => {
+    // 1. Kiểm tra lỗi file not_found
+    if (hasNotFoundFiles && !allFilesNotFound) {
+      const proceed = await appState.confirm({
+        title: "Tệp cấu hình không tồn tại",
+        message: "Có một số tệp cấu hình không tìm thấy trên hệ thống. Bạn có chắc chắn muốn tiếp tục gộp và xuất dữ liệu từ các tệp còn lại không?",
+        confirmText: "Tiếp tục xử lý",
+        cancelText: "Hủy",
+        kind: "warning"
+      });
+      if (!proceed) return;
+    }
+
+    // 2. Kiểm tra lỗi cấu hình
+    if (hasInvalidConfigFiles && !allFilesNotFound) {
+      const proceed = await appState.confirm({
+        title: "Tệp cấu hình bị lỗi",
+        message: "Có một số tệp cấu hình bị lỗi (thiếu thông tin Hãng/NCC hoặc ánh xạ cột). Bạn có chắc chắn muốn tiếp tục gộp và xuất dữ liệu không?",
+        confirmText: "Tiếp tục xử lý",
+        cancelText: "Hủy",
+        kind: "warning"
+      });
+      if (!proceed) return;
+    }
+
     show = false;
     if (onProceed) onProceed();
   };
@@ -119,7 +147,7 @@
           </button>
           <button 
             onclick={handleProceed}
-            disabled={isGeneratingPreview || !!previewError || previewRows.length === 0}
+            disabled={isGeneratingPreview || !!previewError || previewRows.length === 0 || allFilesNotFound}
             class="btn-primary flex items-center gap-2 text-white font-bold text-xs px-4 py-2 rounded-md cursor-pointer transition active:scale-95 disabled:opacity-40 disabled:pointer-events-none"
           >
             <Play size={12} fill="currentColor" /> TIẾN HÀNH XỬ LÝ
