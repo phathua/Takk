@@ -8,6 +8,15 @@
   let selectedFormat = $state('bgx'); // Mặc định chọn .bgx để quảng bá tiết kiệm dung lượng
   let dontShowAgain = $state(false);
 
+  // Định dạng kích thước file
+  const formatFileSize = (bytes) => {
+    if (bytes === undefined || bytes === null || bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  };
+
   function handleCancel() {
     if (dialog.resolve) {
       dialog.resolve(null);
@@ -71,7 +80,7 @@
             class="h-8 object-contain rounded border border-zinc-500/10 bg-white/5 p-0.5 shrink-0"
           />
           <div class="text-[11px] leading-relaxed text-[var(--text-muted)]">
-            Định dạng <strong class="text-[var(--accent)]">Tham chiếu (.bgx)</strong> giúp giảm dung lượng tệp lưu trữ từ <span class="line-through">13.8 MB</span> xuống còn <strong class="text-emerald-500">1.1 KB</strong> bằng cách liên kết file thay vì nhân bản dữ liệu.
+            Định dạng <strong class="text-[var(--accent)]">Tham chiếu (.bgx)</strong> giúp giảm dung lượng tệp lưu trữ từ <span class="line-through">{formatFileSize(dialog.bgSize)}</span> xuống còn <strong class="text-emerald-500">{formatFileSize(dialog.bgxSize)}</strong> bằng cách liên kết file thay vì nhân bản dữ liệu.
           </div>
         </div>
 
@@ -103,7 +112,7 @@
                   <h4 class="text-[11px] font-bold text-[var(--text)]">Dự án Tham chiếu (.bgx)</h4>
                   <div class="flex items-center gap-1.5 mt-0.5">
                     <span class="text-[9px] text-emerald-500 font-bold bg-emerald-500/10 px-1 py-0.2 rounded">Khuyên dùng</span>
-                    <span class="text-[9px] text-[var(--text-muted)] font-mono">~1 KB</span>
+                    <span class="text-[9px] text-[var(--text-muted)] font-mono">~{formatFileSize(dialog.bgxSize)}</span>
                   </div>
                 </div>
               </div>
@@ -115,7 +124,7 @@
               <div class="space-y-1.5">
                 <div class="text-[9px] font-bold uppercase text-[var(--text)] tracking-wider">Đặc điểm chính:</div>
                 <ul class="text-[10px] text-[var(--text-muted)] space-y-1 list-disc pl-3">
-                  <li>Kích thước cực nhỏ (<strong class="text-[var(--text)]">~1.1 KB</strong>)</li>
+                  <li>Kích thước cực nhỏ (<strong class="text-[var(--text)]">~{formatFileSize(dialog.bgxSize)}</strong>)</li>
                   <li>Lưu và tải ngay lập tức</li>
                   <li>Không nhân bản file Excel gốc</li>
                 </ul>
@@ -153,7 +162,7 @@
                   <h4 class="text-[11px] font-bold text-[var(--text)]">Dự án Đóng gói (.bg)</h4>
                   <div class="flex items-center gap-1.5 mt-0.5">
                     <span class="text-[9px] text-amber-500 font-bold bg-amber-500/10 px-1 py-0.2 rounded">Tự chứa dữ liệu</span>
-                    <span class="text-[9px] text-[var(--text-muted)] font-mono">~13.8 MB</span>
+                    <span class="text-[9px] text-[var(--text-muted)] font-mono">~{formatFileSize(dialog.bgSize)}</span>
                   </div>
                 </div>
               </div>

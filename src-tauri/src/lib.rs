@@ -551,6 +551,39 @@ fn calculate_file_hash(path: String) -> Result<String, String> {
     Ok(blake3::hash(&bytes).to_hex().to_string())
 }
 
+#[tauri::command]
+fn get_project_estimated_sizes(
+    files: Vec<types::FileConfig>,
+    export_format: Option<String>,
+    app_mode: Option<String>,
+) -> Result<(u64, u64), String> {
+    // 1. Tính toán dung lượng .bgx (Tham chiếu)
+    let project_bgx = project::pack_project_files(
+        files.clone(),
+        export_format.clone(),
+        app_mode.clone(),
+        &PathBuf::from("dummy.bgx"),
+    ).map_err(|e| e.to_string())?;
+    
+    let serialized_bgx = postcard::to_stdvec(&project_bgx).map_err(|e| e.to_string())?;
+    let compressed_bgx = zstd::encode_all(serialized_bgx.as_slice(), 3).map_err(|e| e.to_string())?;
+    let size_bgx = compressed_bgx.len() as u64;
+
+    // 2. Tính toán dung lượng .bg (Đóng gói)
+    let project_bg = project::pack_project_files(
+        files,
+        export_format,
+        app_mode,
+        &PathBuf::from("dummy.bg"),
+    ).map_err(|e| e.to_string())?;
+    
+    let serialized_bg = postcard::to_stdvec(&project_bg).map_err(|e| e.to_string())?;
+    let compressed_bg = zstd::encode_all(serialized_bg.as_slice(), 3).map_err(|e| e.to_string())?;
+    let size_bg = compressed_bg.len() as u64;
+
+    Ok((size_bg, size_bgx))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -602,7 +635,8 @@ pub fn run() {
             get_files_metadata,
             updater::check_for_updates,
             updater::download_and_install,
-            calculate_file_hash
+            calculate_file_hash,
+            get_project_estimated_sizes
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

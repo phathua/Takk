@@ -58,14 +58,49 @@ class AppState {
   saveProjectDialog = $state({
     show: false,
     saveAs: false,
+    bgSize: 0,
+    bgxSize: 0,
     resolve: null
   });
 
-  showSaveProjectModal(saveAs = false) {
+  async showSaveProjectModal(saveAs = false) {
+    let bgSize = 0;
+    let bgxSize = 0;
+    try {
+      const sizes = await invoke('get_project_estimated_sizes', {
+        files: this.files.map(f => ({
+          path: f.path,
+          sheet_name: f.sheet_name,
+          brand: f.brand,
+          provider: f.provider,
+          headers: f.headers,
+          mapping: f.mapping,
+          normalize_basic: f.normalize_basic,
+          normalize_special: f.normalize_special,
+          normalize_position: f.normalize_position,
+          normalize_suffix: f.normalize_suffix,
+          generate_cost: f.generate_cost,
+          cost_discount_percent: f.cost_discount_percent,
+          created_at: f.created_at,
+          not_found: f.not_found,
+          file_hash: f.file_hash,
+          original_path: f.original_path
+        })),
+        exportFormat: this.exportFormat,
+        appMode: null
+      });
+      bgSize = sizes[0];
+      bgxSize = sizes[1];
+    } catch (e) {
+      console.error("Lỗi khi ước lượng kích thước dự án:", e);
+    }
+
     return new Promise((resolve) => {
       this.saveProjectDialog = {
         show: true,
         saveAs,
+        bgSize,
+        bgxSize,
         resolve
       };
     });
