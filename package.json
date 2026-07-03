@@ -1,7 +1,7 @@
 {
   "name": "takk-price-list-processor",
   "private": true,
-  "version": "0.4.3",
+  "version": "0.4.9",
   "type": "module",
   "scripts": {
     "dev": "vite",
