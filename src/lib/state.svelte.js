@@ -54,6 +54,23 @@ class AppState {
     });
   }
 
+  // Save Project Modal state toàn cục
+  saveProjectDialog = $state({
+    show: false,
+    saveAs: false,
+    resolve: null
+  });
+
+  showSaveProjectModal(saveAs = false) {
+    return new Promise((resolve) => {
+      this.saveProjectDialog = {
+        show: true,
+        saveAs,
+        resolve
+      };
+    });
+  }
+
   // Lịch sử undo/redo cho files & mapping
   historyUndoStack = $state([]);
   historyRedoStack = $state([]);
@@ -768,6 +785,10 @@ class AppState {
     try {
       let path = this.currentProjectPath;
       if (!path || saveAs) {
+        // Mở modal lựa chọn và giới thiệu định dạng lưu trữ
+        const format = await this.showSaveProjectModal(saveAs);
+        if (!format) return; // Người dùng hủy bỏ hoặc đóng modal
+
         const now = new Date();
         const yyyy = now.getFullYear();
         const mm = String(now.getMonth() + 1).padStart(2, '0');
@@ -775,18 +796,14 @@ class AppState {
         const hh = String(now.getHours()).padStart(2, '0');
         const min = String(now.getMinutes()).padStart(2, '0');
         const ss = String(now.getSeconds()).padStart(2, '0');
-        const defaultName = `Takk_${yyyy}${mm}${dd}_${hh}${min}${ss}.bgx`;
+        const defaultName = `Takk_${yyyy}${mm}${dd}_${hh}${min}${ss}.${format}`;
 
         path = await save({
           defaultPath: defaultName,
           filters: [
             {
-              name: 'Dự án Takk tham chiếu (.bgx)',
-              extensions: ['bgx']
-            },
-            {
-              name: 'Dự án Takk đóng gói (.bg)',
-              extensions: ['bg']
+              name: format === 'bgx' ? 'Dự án Takk tham chiếu (.bgx)' : 'Dự án Takk đóng gói (.bg)',
+              extensions: [format]
             }
           ]
         });

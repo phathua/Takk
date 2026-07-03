@@ -9,6 +9,7 @@
   // Import global state
   import { appState } from './lib/state.svelte.js';
   import ConfirmModal from './components/ConfirmModal.svelte';
+  import SaveProjectModal from './components/SaveProjectModal.svelte';
 
   let isGlobalDragOver = $state(false);
   let draggedTabIdx = $state(null);
@@ -521,5 +522,8 @@
 
   <!-- CONFIRM MODAL -->
   <ConfirmModal />
+
+  <!-- SAVE PROJECT MODAL -->
+  <SaveProjectModal />
 
 </div>
