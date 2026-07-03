@@ -584,6 +584,62 @@ fn get_project_estimated_sizes(
     Ok((size_bg, size_bgx))
 }
 
+#[cfg(target_os = "windows")]
+fn register_windows_file_associations(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+    use std::os::windows::process::CommandExt;
+    use tauri::Manager;
+
+    let exe_path = std::env::current_exe()?;
+    let exe_str = exe_path.to_string_lossy();
+    
+    // Thu muc app local data
+    let app_data = app.path().app_local_data_dir()?;
+    std::fs::create_dir_all(&app_data)?;
+    let icon_path = app_data.join("file-association.ico");
+    
+    // Ghi file icon tu resources
+    let icon_bytes = include_bytes!("../icons/file-association.ico");
+    std::fs::write(&icon_path, icon_bytes)?;
+    let icon_str = icon_path.to_string_lossy();
+    
+    // Thiet lap cac lenh reg de ghi vao registry HKCU (khong can quyen admin)
+    let icon_param = format!("\"{}\"", icon_str);
+    let exe_param = format!("\"{}\" \"%1\"", exe_str);
+
+    let commands = vec![
+        vec!["add", "HKCU\\Software\\Classes\\.bg", "/ve", "/t", "REG_SZ", "/d", "Takk.Project.Packaged", "/f"],
+        vec!["add", "HKCU\\Software\\Classes\\.bgx", "/ve", "/t", "REG_SZ", "/d", "Takk.Project.Referenced", "/f"],
+        
+        vec!["add", "HKCU\\Software\\Classes\\Takk.Project.Packaged", "/ve", "/t", "REG_SZ", "/d", "Du an Takk Dong goi (chua du lieu tho)", "/f"],
+        vec!["add", "HKCU\\Software\\Classes\\Takk.Project.Packaged\\DefaultIcon", "/ve", "/t", "REG_SZ", "/d", &icon_param, "/f"],
+        vec!["add", "HKCU\\Software\\Classes\\Takk.Project.Packaged\\shell\\open\\command", "/ve", "/t", "REG_SZ", "/d", &exe_param, "/f"],
+        
+        vec!["add", "HKCU\\Software\\Classes\\Takk.Project.Referenced", "/ve", "/t", "REG_SZ", "/d", "Du an Takk Tham chieu (chi luu duong dan)", "/f"],
+        vec!["add", "HKCU\\Software\\Classes\\Takk.Project.Referenced\\DefaultIcon", "/ve", "/t", "REG_SZ", "/d", &icon_param, "/f"],
+        vec!["add", "HKCU\\Software\\Classes\\Takk.Project.Referenced\\shell\\open\\command", "/ve", "/t", "REG_SZ", "/d", &exe_param, "/f"],
+    ];
+    
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+    for args in commands {
+        let status = std::process::Command::new("reg")
+            .args(&args)
+            .creation_flags(CREATE_NO_WINDOW)
+            .status();
+        if let Err(e) = status {
+            crate::applog!("ERROR", "[Registry] Loi khi chay lenh reg: {}", e);
+        }
+    }
+    
+    // Lam moi shell de nhan dien file association va icon moi
+    let _ = std::process::Command::new("powershell")
+        .args(&["-Command", "ie4uinit.exe -show"])
+        .creation_flags(CREATE_NO_WINDOW)
+        .status();
+
+    crate::applog!("SUCCESS", "[Registry] Da dang ky file association va icon cho .bg va .bgx thanh cong");
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -608,6 +664,12 @@ pub fn run() {
             use tauri::Emitter;
             let _ = APP_HANDLE.set(app.handle().clone());
             
+            // Dang ky file association cho Windows
+            #[cfg(target_os = "windows")]
+            if let Err(e) = register_windows_file_associations(app) {
+                crate::applog!("ERROR", "[Registry] Loi khi tu dong dang ky file association: {}", e);
+            }
+
             // Tu dong mo file neu co doi so truyen vao luc khoi dong
             let args: Vec<String> = std::env::args().collect();
             if args.len() > 1 {
