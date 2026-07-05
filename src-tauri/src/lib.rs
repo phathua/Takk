@@ -414,49 +414,74 @@ async fn get_preview_rows(
 }
 
 // Helper function de xuat du lieu ra file Excel (.xlsx)
-fn export_as_xlsx(all_rows: &[PriceRow], path: &std::path::Path) -> Result<(), String> {
+fn export_as_xlsx(all_rows: &[PriceRow], path: &std::path::Path, skip_fingerprint: bool) -> Result<(), String> {
     use rust_xlsxwriter::Workbook;
 
     let mut workbook = Workbook::new();
     let worksheet = workbook.add_worksheet();
 
     // Ghi tieu de (header)
-    let headers_vi = [
-        "Mã sản phẩm", "Mã cũ/thay thế", "Tên sản phẩm", "Hãng", "Nhà cung cấp",
-        "Giá vốn", "Giá bán lẻ", "Đời xe", "Mã màu", "Ghi chú", "Ngày tạo"
+    let mut headers = vec![
+        "product_code", "alt_code", "name", "brand", "provider", 
+        "model", "color_code", "cost_price", "retail_price", "percent", "note", "created_at", "updated_at"
     ];
+    if !skip_fingerprint {
+        headers.insert(0, "fingerprint");
+    }
 
-    for (col_idx, header) in headers_vi.iter().enumerate() {
+    for (col_idx, header) in headers.iter().enumerate() {
         worksheet.write_string(0, col_idx as u16, *header).map_err(|e| e.to_string())?;
     }
 
     // Ghi tung dong du lieu
+    let updated_at_str = chrono::Local::now().to_rfc3339();
     for (row_idx, r) in all_rows.iter().enumerate() {
         let r_idx = (row_idx + 1) as u32;
-        worksheet.write_string(r_idx, 0, &r.product_code).map_err(|e| e.to_string())?;
-        worksheet.write_string(r_idx, 1, r.alt_code.as_deref().unwrap_or("")).map_err(|e| e.to_string())?;
-        worksheet.write_string(r_idx, 2, &r.name).map_err(|e| e.to_string())?;
-        worksheet.write_string(r_idx, 3, &r.brand).map_err(|e| e.to_string())?;
-        worksheet.write_string(r_idx, 4, &r.provider).map_err(|e| e.to_string())?;
+        let mut col = 0;
         
-        // Ghi dung kieu so de Excel tinh toan duoc
-        worksheet.write_number(r_idx, 5, r.cost_price).map_err(|e| e.to_string())?;
+        if !skip_fingerprint {
+            worksheet.write_string(r_idx, col, &r.fingerprint).map_err(|e| e.to_string())?;
+            col += 1;
+        }
+
+        worksheet.write_string(r_idx, col, &r.product_code).map_err(|e| e.to_string())?;
+        worksheet.write_string(r_idx, col + 1, r.alt_code.as_deref().unwrap_or("")).map_err(|e| e.to_string())?;
+        worksheet.write_string(r_idx, col + 2, &r.name).map_err(|e| e.to_string())?;
+        worksheet.write_string(r_idx, col + 3, &r.brand).map_err(|e| e.to_string())?;
+        worksheet.write_string(r_idx, col + 4, &r.provider).map_err(|e| e.to_string())?;
+        worksheet.write_string(r_idx, col + 5, r.model.as_deref().unwrap_or("")).map_err(|e| e.to_string())?;
+        worksheet.write_string(r_idx, col + 6, r.color_code.as_deref().unwrap_or("")).map_err(|e| e.to_string())?;
+        worksheet.write_number(r_idx, col + 7, r.cost_price).map_err(|e| e.to_string())?;
         
         if let Some(price) = r.retail_price {
-            worksheet.write_number(r_idx, 6, price).map_err(|e| e.to_string())?;
+            worksheet.write_number(r_idx, col + 8, price).map_err(|e| e.to_string())?;
+            
+            // Tinh phan tram loi nhuan bien
+            if price > 0.0 {
+                let cost = r.cost_price;
+                let profit = price - cost;
+                let percent = (profit / price) * 100.0;
+                let final_margin = format!("{}%", 
+                    format!("{:.1}", percent).replace(".", ",")
+                );
+                worksheet.write_string(r_idx, col + 9, &final_margin).map_err(|e| e.to_string())?;
+            } else {
+                worksheet.write_string(r_idx, col + 9, "").map_err(|e| e.to_string())?;
+            }
         } else {
-            worksheet.write_string(r_idx, 6, "").map_err(|e| e.to_string())?;
+            worksheet.write_string(r_idx, col + 8, "").map_err(|e| e.to_string())?;
+            worksheet.write_string(r_idx, col + 9, "").map_err(|e| e.to_string())?;
         }
         
-        worksheet.write_string(r_idx, 7, r.model.as_deref().unwrap_or("")).map_err(|e| e.to_string())?;
-        worksheet.write_string(r_idx, 8, r.color_code.as_deref().unwrap_or("")).map_err(|e| e.to_string())?;
-        worksheet.write_string(r_idx, 9, r.note.as_deref().unwrap_or("")).map_err(|e| e.to_string())?;
+        worksheet.write_string(r_idx, col + 10, r.note.as_deref().unwrap_or("")).map_err(|e| e.to_string())?;
         
         if let Some(d) = r.created_at {
-            worksheet.write_string(r_idx, 10, &d.format("%d/%m/%Y").to_string()).map_err(|e| e.to_string())?;
+            worksheet.write_string(r_idx, col + 11, &d.format("%d/%m/%Y").to_string()).map_err(|e| e.to_string())?;
         } else {
-            worksheet.write_string(r_idx, 10, "").map_err(|e| e.to_string())?;
+            worksheet.write_string(r_idx, col + 11, "").map_err(|e| e.to_string())?;
         }
+        
+        worksheet.write_string(r_idx, col + 12, &updated_at_str).map_err(|e| e.to_string())?;
     }
 
     workbook.save(path).map_err(|e| e.to_string())?;
@@ -464,38 +489,52 @@ fn export_as_xlsx(all_rows: &[PriceRow], path: &std::path::Path) -> Result<(), S
 }
 
 // Helper function de xuat du lieu ra file CSV (.csv)
-fn export_as_csv(all_rows: &[PriceRow], path: &std::path::Path) -> Result<(), String> {
+fn export_as_csv(all_rows: &[PriceRow], path: &std::path::Path, skip_fingerprint: bool) -> Result<(), String> {
     let mut wtr = csv::Writer::from_path(path).map_err(|e| e.to_string())?;
-    wtr.write_record([
-        "Mã sản phẩm", "Mã cũ/thay thế", "Tên sản phẩm", "Hãng", "Nhà cung cấp",
-        "Giá vốn", "Giá bán lẻ", "Đời xe", "Mã màu", "Ghi chú", "Ngày tạo"
-    ]).map_err(|e| e.to_string())?;
+    
+    // Header
+    let mut headers = vec![
+        "product_code", "alt_code", "name", "brand", "provider", 
+        "model", "color_code", "cost_price", "retail_price", "percent", "note", "created_at", "updated_at"
+    ];
+    if !skip_fingerprint {
+        headers.insert(0, "fingerprint");
+    }
+    wtr.write_record(&headers).map_err(|e| e.to_string())?;
 
-    // Dung buffer tam de tranh alloc string tung truong
-    let mut cost_buf = String::new();
-    let mut retail_buf = String::new();
-    let mut date_buf = String::new();
+    let updated_at_str = chrono::Local::now().to_rfc3339();
     for r in all_rows {
-        use std::fmt::Write as _;
-        cost_buf.clear(); let _ = write!(cost_buf, "{}", r.cost_price);
-        retail_buf.clear();
-        if let Some(v) = r.retail_price { let _ = write!(retail_buf, "{}", v); }
-        date_buf.clear();
-        if let Some(d) = r.created_at { let _ = write!(date_buf, "{}", d.format("%d/%m/%Y")); }
+        let mut margin_display = String::new();
+        if let Some(price) = r.retail_price {
+            if price > 0.0 {
+                let cost = r.cost_price;
+                let profit = price - cost;
+                let percent = (profit / price) * 100.0;
+                margin_display = format!("{}%", 
+                    format!("{:.1}", percent).replace(".", ",")
+                );
+            }
+        }
 
-        wtr.write_record(&[
-            r.product_code.as_str(),
-            r.alt_code.as_deref().unwrap_or(""),
-            r.name.as_str(),
-            r.brand.as_str(),
-            r.provider.as_str(),
-            cost_buf.as_str(),
-            retail_buf.as_str(),
-            r.model.as_deref().unwrap_or(""),
-            r.color_code.as_deref().unwrap_or(""),
-            r.note.as_deref().unwrap_or(""),
-            date_buf.as_str(),
-        ]).map_err(|e| e.to_string())?;
+        let mut record = vec![
+            r.product_code.clone(),
+            r.alt_code.clone().unwrap_or_default(),
+            r.name.clone(),
+            r.brand.clone(),
+            r.provider.clone(),
+            r.model.as_deref().unwrap_or("").to_string(),
+            r.color_code.as_deref().unwrap_or("").to_string(),
+            r.cost_price.to_string(),
+            r.retail_price.map(|p| p.to_string()).unwrap_or_default(),
+            margin_display,
+            r.note.as_deref().unwrap_or("").to_string(),
+            r.created_at.map(|d| d.format("%d/%m/%Y").to_string()).unwrap_or_default(),
+            updated_at_str.clone(),
+        ];
+        if !skip_fingerprint {
+            record.insert(0, r.fingerprint.clone());
+        }
+        wtr.write_record(&record).map_err(|e| e.to_string())?;
     }
     wtr.flush().map_err(|e| e.to_string())?;
     Ok(())
@@ -507,6 +546,7 @@ fn process_and_export(
     files: Vec<FileConfig>,
     export_format: String,
     output_path: String,
+    skip_fingerprint: Option<bool>,
 ) -> Result<String, String> {
     applog!("INFO", "Bat dau gop va xuat {} file...", files.len());
     let mut all_rows: Vec<PriceRow> = Vec::new();
@@ -588,10 +628,12 @@ fn process_and_export(
     let is_xlsx = export_format.to_lowercase() == "xlsx"
         || path.extension().and_then(|s| s.to_str()).map(|s| s.to_lowercase() == "xlsx").unwrap_or(false);
 
+    let skip_fp = skip_fingerprint.unwrap_or(true);
+
     if is_xlsx {
-        export_as_xlsx(&all_rows, &path)?;
+        export_as_xlsx(&all_rows, &path, skip_fp)?;
     } else {
-        export_as_csv(&all_rows, &path)?;
+        export_as_csv(&all_rows, &path, skip_fp)?;
     }
 
     let success_msg = format!("Da gop va xuat {} san pham ra file: {:?}", all_rows.len(), path.file_name().unwrap_or_default());
