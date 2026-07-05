@@ -1,6 +1,6 @@
 [package]
 name = "takk"
-version = "0.5.2"
+version = "0.5.9"
 description = "Takk - Price List Processor"
 authors = ["you"]
 edition = "2021"
@@ -30,7 +30,7 @@ rust_xlsxwriter = "0.96"
 anyhow = { version = "1.0", default-features = false, features = ["std"] }
 encoding_rs = "0.8"
 tokio = { version = "1", default-features = false, features = ["sync", "macros", "rt", "time"] }
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "native-tls"] }
 blake3 = "1.5"
 
 [profile.release]
